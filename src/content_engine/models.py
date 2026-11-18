@@ -30,6 +30,9 @@ def _flatten_scene_dict(d: dict[str, Any], idx: int) -> list[dict[str, Any]]:
                 "speaker": line.get("speaker", d.get("speaker")),
                 "gender": line.get("gender", d.get("gender")),
                 "voice": line.get("voice", d.get("voice")),
+                "character_style": line.get("character_style", d.get("character_style")),
+                "look": line.get("look", d.get("look")),
+                "avatar_id": line.get("avatar_id", d.get("avatar_id")),
             }
         )
     return out or [d]
@@ -44,6 +47,9 @@ class Scene:
     speaker: str | None = None
     gender: str | None = None
     voice: str | None = None
+    character_style: str | None = None
+    look: str | None = None
+    avatar_id: str | None = None
 
     @staticmethod
     def from_dict(d: dict[str, Any], idx: int) -> Scene:
@@ -57,6 +63,11 @@ class Scene:
             speaker=(str(d["speaker"]).strip() if d.get("speaker") else None),
             gender=(str(d["gender"]).strip().lower() if d.get("gender") else None),
             voice=(str(d["voice"]).strip() if d.get("voice") else None),
+            character_style=(
+                str(d["character_style"]).strip().lower() if d.get("character_style") else None
+            ),
+            look=(str(d["look"]).strip() if d.get("look") else None),
+            avatar_id=(str(d["avatar_id"]).strip() if d.get("avatar_id") else None),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -73,6 +84,12 @@ class Scene:
             row["gender"] = self.gender
         if self.voice:
             row["voice"] = self.voice
+        if self.character_style:
+            row["character_style"] = self.character_style
+        if self.look:
+            row["look"] = self.look
+        if self.avatar_id:
+            row["avatar_id"] = self.avatar_id
         return row
 
 
@@ -85,6 +102,7 @@ class Script:
     language: str
     aspect: str
     scenes: list[Scene]
+    visual_style: str | None = None
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> Script:
@@ -100,6 +118,7 @@ class Script:
         for s in scenes:
             if not s.text:
                 raise ValueError(f"scene {s.id} has empty text")
+        vs = d.get("visual_style") or d.get("character_style")
         return Script(
             schema=str(d.get("schema") or "dup.content_script.v1"),
             title=str(d.get("title") or "untitled").strip(),
@@ -108,10 +127,11 @@ class Script:
             language=str(d.get("language") or "en"),
             aspect=str(d.get("aspect") or "9:16"),
             scenes=scenes,
+            visual_style=(str(vs).strip().lower() if vs else None),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        row = {
             "schema": self.schema,
             "title": self.title,
             "description": self.description,
@@ -120,6 +140,9 @@ class Script:
             "aspect": self.aspect,
             "scenes": [s.to_dict() for s in self.scenes],
         }
+        if self.visual_style:
+            row["visual_style"] = self.visual_style
+        return row
 
 
 @dataclass

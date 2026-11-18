@@ -136,6 +136,29 @@ def build_parser() -> argparse.ArgumentParser:
     av.add_argument("--dry-run", action="store_true")
     av.add_argument("--provider", type=str, default=None)
 
+    chp = sub.add_parser(
+        "character-preview",
+        help="Local character plate PNG (cartoon/anime/… — not HeyGen photoreal)",
+    )
+    chp.add_argument("--style", type=str, default="cartoon")
+    chp.add_argument("--speaker", type=str, default="Hero")
+    chp.add_argument("--emotion", type=str, default="neutral")
+    chp.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "characters")
+    chp.add_argument("--width", type=int, default=540)
+    chp.add_argument("--height", type=int, default=960)
+    chp.add_argument(
+        "--cast",
+        action="store_true",
+        help="Export plates for full roster (Лиса/Зайка/…)",
+    )
+    chp.add_argument(
+        "--reel",
+        action="store_true",
+        help="Build cast reel mp4 + HTML sheet (offline TTS by default)",
+    )
+    chp.add_argument("--language", type=str, default="ru")
+    chp.add_argument("--online-tts", action="store_true", help="Allow edge-tts for cast reel")
+
     cal = sub.add_parser("calendar", help="Local content calendar from topics (no publish)")
     cal.add_argument(
         "topics",
@@ -574,6 +597,46 @@ def main(argv: list[str] | None = None) -> int:
             provider=args.provider,
         )
         print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "character-preview":
+        from content_engine.character_kit import (
+            build_cast_reel,
+            build_cast_sheet,
+            export_cast_plates,
+            preview_plate,
+        )
+
+        if args.reel:
+            result = build_cast_reel(
+                out_dir=(args.out / "cast") if args.out else None,
+                language=args.language,
+                width=args.width,
+                height=args.height,
+                allow_network_tts=bool(args.online_tts),
+            )
+        elif args.cast:
+            result = export_cast_plates(
+                out_dir=args.out / "cast" if args.out else None,
+                width=args.width,
+                height=args.height,
+            )
+            sheet = build_cast_sheet(
+                plates=result.get("plates"),
+                out_dir=Path(result["dir"]) if result.get("dir") else None,
+                language=args.language,
+            )
+            result = {**result, "sheet": sheet}
+        else:
+            result = preview_plate(
+                style=args.style,
+                speaker=args.speaker,
+                emotion=args.emotion,
+                width=args.width,
+                height=args.height,
+                out_dir=args.out,
+            )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0 if result.get("ok") else 1
 
     if args.cmd == "calendar":

@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.1.25 — 2026-11-18
+
+- **Cast reel**: roster plates + short TTS lines → `cast_reel.mp4` + `CAST_SHEET.html`
+- CLI `character-preview --reel` (offline TTS default; `--online-tts` optional)
+- Console **Cast reel** button; open `out/characters/` via `/api/open`
+
+## 0.1.24 — 2026-11-18
+
+- GLB **emotion morphs** (joy/sad/fear/…) layered under lip visemes when ARKit names exist
+- **Export cast plates** — full roster PNG sheet (`character-preview --cast`)
+- Console: emotion morph readout + cast plates button
+
+## 0.1.23 — 2026-11-18
+
+- GLB **morph-target lip preview**: Oculus/ARKit name matching when present on mesh
+- Speak drives morph influences (fallback: procedural mouth / slight scale)
+- Characters: **Render cast demo** → cartoon emotion fixture pipeline
+- `assets/avatars/README.md` — how to export Mixamo+viseme GLB
+
+## 0.1.22 — 2026-11-18
+
+- Character **roster** (Лиса / Зайка / Hero / Narrator) → default style in pipeline
+- Console **Speak preview**: rule-based visemes + mouth open on procedural bust
+- Optional Web Speech for local line playback (not a quality claim)
+- `/api/characters` action `visemes`; honesty: not ARKit / TalkingHead accuracy
+
+## 0.1.21 — 2026-11-18
+
+- Characters: **GLB mesh preview** when `assets/avatars/*.glb` present (Three.js GLTFLoader)
+- Prefs `selected_glb`; console model picker + **Plate PNG** action
+- CLI `character-preview` — local stylized plate (not HeyGen)
+- Cartoon fixture scenes carry per-character `character_style`
+- Honesty: GLB preview ≠ TalkingHead lip-sync yet; no photoreal DiT claim
+
+## 0.1.20 — 2026-11-18
+
+- **Character Kit** (local): styles `cartoon` · `anime` · `mascot` · `clay` · `realistic_stylized`
+- Pillow bust plates → ffmpeg clips when speaker/style enabled (not HeyGen photoreal)
+- Ops Console Studio → **Characters**: procedural Three.js preview + prefs (`/api/characters`)
+- Scene/script fields: `character_style`, `visual_style`, `look`, `avatar_id`
+- Slot: `assets/avatars/*.glb` for future TalkingHead; docs `CHARACTER_3D_SCAN.md`
+- Honesty: optional HeyGen stays in `avatar.py` — demo green without GPU/keys
+
 ## 0.1.19 — 2026-11-18
 
 - Ops Console visual upgrade: colorful nav accents, glow cards, gradient wash

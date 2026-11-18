@@ -474,6 +474,20 @@ body {
 .thumb-grid .t { font-size: 0.72rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thumb-grid .s { font-size: 0.65rem; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
 
+
+.char-stage {
+  position: relative; height: 340px; border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(600px 280px at 50% 20%, color-mix(in srgb, var(--c-indigo) 28%, transparent), transparent 55%),
+    linear-gradient(180deg, #0b1020, #151a2e);
+}
+.char-stage canvas { width: 100% !important; height: 100% !important; display: block; }
+.char-stage .char-fallback {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: #c7d2fe; font-size: 0.9rem; padding: 16px; text-align: center;
+}
+
 </style>
 </head>
 <body>
@@ -578,6 +592,7 @@ body {
         <button type="button" data-wb="compose" class="on" data-i18n="wbCompose">Compose</button>
         <button type="button" data-wb="look" data-i18n="wbLook">Look</button>
         <button type="button" data-wb="audio" data-i18n="wbAudio">Music & SFX</button>
+        <button type="button" data-wb="characters" data-i18n="wbCharacters">Characters</button>
         <button type="button" data-wb="ideas" data-i18n="wbIdeas">Ideas</button>
       </div>
 
@@ -655,6 +670,74 @@ body {
             <div class="row" style="margin-top:16px">
               <button class="btn" id="btnSaveStudio" data-i18n="saveStudio">Save studio pack</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div class="wb" id="wb-characters">
+        <div class="gap-scan indigo">
+          <h4 data-i18n="gapCharTitle">Персонажи · 3D / стили</h4>
+          <p class="sub" data-i18n="gapCharSub">Локальный Character Kit + procedural Three.js. Не HeyGen DiT / SadTalker GPU. .glb → assets/avatars/ позже.</p>
+          <div class="chip-row">
+            <span class="chip have" data-i18n="chipHaveStyles">есть style bank</span>
+            <span class="chip have" data-i18n="chipHave3d">есть 3D preview</span>
+            <span class="chip miss" data-i18n="chipMissHeygen">нет photoreal DiT offline</span>
+            <span class="chip soon" data-i18n="chipSoonGlb">скоро: TalkingHead + GLB</span>
+          </div>
+        </div>
+        <div class="grid two">
+          <div class="card glow-indigo">
+            <h3 data-i18n="charPreview">3D preview</h3>
+            <div class="char-stage" id="charStage">
+              <canvas id="charCanvas"></canvas>
+              <div class="char-fallback" id="charFallback" hidden data-i18n="charFallback">Загрузка 3D…</div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="field"><span data-i18n="charSpeaker">Speaker</span>
+                <input id="charSpeaker" value="Лиса"/>
+              </label>
+              <label class="field"><span data-i18n="charEmotion">Emotion</span>
+                <select id="charEmotion">
+                  <option value="neutral">neutral</option>
+                  <option value="joy">joy</option>
+                  <option value="tension">tension</option>
+                  <option value="whisper">whisper</option>
+                  <option value="sad">sad</option>
+                </select>
+              </label>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="field" style="flex:1"><span data-i18n="charGlb">3D model (.glb)</span>
+                <select id="charGlbSelect"><option value="procedural">procedural bust</option></select>
+              </label>
+              <button class="btn ghost" id="btnCharPlate" data-i18n="charPlate">Plate PNG</button>
+            </div>
+            <div class="section-label" style="margin-top:12px" data-i18n="charCast">Cast</div>
+            <div class="chip-row" id="charRoster" style="margin-bottom:8px"></div>
+            <label class="field"><span data-i18n="charLine">Line</span>
+              <input id="charLine" value="Ты слышишь? Кажется, рядом кто-то есть."/>
+            </label>
+            <div class="row" style="margin-top:10px">
+              <button class="btn primary" id="btnCharSpeak" data-i18n="charSpeak">Speak preview</button>
+              <button class="btn ghost" id="btnCharStop" data-i18n="charStop">Stop</button>
+              <button class="btn ghost" id="btnCharDemo" data-i18n="charDemo">Render cast demo</button>
+              <button class="btn ghost" id="btnCastPlates" data-i18n="castPlates">Export cast plates</button>
+              <button class="btn primary" id="btnCastReel" data-i18n="castReel">Cast reel</button>
+            </div>
+            <p class="sub mono" id="charMorphMeta" style="margin-top:8px"></p>
+          </div>
+          <div class="card">
+            <h3 data-i18n="charStyles">Character styles</h3>
+            <p class="sub" data-i18n="charStylesHint">cartoon · anime · mascot · clay · realistic_stylized</p>
+            <div class="choice-grid" id="charStyleGrid" style="margin-top:10px"></div>
+            <label class="check" style="margin-top:14px"><input type="checkbox" id="charEnabled" checked/> <span data-i18n="charEnabled">Use character plates in render</span></label>
+            <div class="row" style="margin-top:12px">
+              <button class="btn" id="btnSaveChars" data-i18n="saveChars">Save character prefs</button>
+              <button class="btn ghost" id="btnOpenAvatars" data-i18n="openAvatars">Open avatars/</button>
+            </div>
+            <div class="log" id="charLog" style="margin-top:12px"></div>
+            <p class="path-chip" id="charGlbHint" style="margin-top:10px"></p>
           </div>
         </div>
       </div>
@@ -978,6 +1061,20 @@ const I18N = {
     themeLight: "Светлый", themeDark: "Тёмный", refresh: "Обновить",
     recentJobs: "Последние задания", preview: "Превью",
     wbCompose: "Сборка", wbLook: "Образ", wbAudio: "Музыка & SFX", wbIdeas: "Идеи",
+
+    wbCharacters: "Персонажи",
+    gapCharTitle: "Персонажи · 3D / стили",
+    gapCharSub: "Локальный Character Kit + procedural Three.js. Не HeyGen DiT / SadTalker GPU.",
+    chipHaveStyles: "есть style bank", chipHave3d: "есть 3D preview",
+    chipMissHeygen: "нет photoreal DiT offline", chipSoonGlb: "скоро: TalkingHead + GLB",
+    charPreview: "3D превью", charFallback: "Загрузка 3D…",
+    charSpeaker: "Спикер", charEmotion: "Эмоция",
+    charStyles: "Стили персонажей",
+    charStylesHint: "cartoon · anime · mascot · clay · realistic_stylized",
+    charEnabled: "Плейты персонажей в рендере",
+    saveChars: "Сохранить персонажей", openAvatars: "Открыть avatars/",
+    charGlb: "3D модель (.glb)", charPlate: "Plate PNG",
+    charCast: "Состав", charLine: "Реплика", charSpeak: "Speak превью", charStop: "Стоп", charDemo: "Рендер cast demo", castPlates: "Экспорт cast plates", castReel: "Cast reel",
     activePack: "Активный studio pack", packHint: "Шаблон + образ + музыка на каждый рендер.",
     templates: "Шаблоны", tplHint: "Один pack = титры + цвет + motion + музыка.",
     colorGrade: "Цветокор", motion: "Motion", musicMood: "Настроение музыки",
@@ -1097,6 +1194,20 @@ const I18N = {
     themeLight: "Light", themeDark: "Dark", refresh: "Refresh",
     recentJobs: "Recent jobs", preview: "Preview",
     wbCompose: "Compose", wbLook: "Look", wbAudio: "Music & SFX", wbIdeas: "Ideas",
+
+    wbCharacters: "Characters",
+    gapCharTitle: "Characters · 3D / styles",
+    gapCharSub: "Local Character Kit + procedural Three.js. Not HeyGen DiT / SadTalker GPU.",
+    chipHaveStyles: "have style bank", chipHave3d: "have 3D preview",
+    chipMissHeygen: "no photoreal DiT offline", chipSoonGlb: "soon: TalkingHead + GLB",
+    charPreview: "3D preview", charFallback: "Loading 3D…",
+    charSpeaker: "Speaker", charEmotion: "Emotion",
+    charStyles: "Character styles",
+    charStylesHint: "cartoon · anime · mascot · clay · realistic_stylized",
+    charEnabled: "Use character plates in render",
+    saveChars: "Save character prefs", openAvatars: "Open avatars/",
+    charGlb: "3D model (.glb)", charPlate: "Plate PNG",
+    charCast: "Cast", charLine: "Line", charSpeak: "Speak preview", charStop: "Stop", charDemo: "Render cast demo", castPlates: "Export cast plates", castReel: "Cast reel",
     activePack: "Active studio pack", packHint: "Template + look + music apply on every render.",
     templates: "Templates", tplHint: "One pack = captions + grade + motion + music.",
     colorGrade: "Color grade", motion: "Motion", musicMood: "Music mood",
@@ -2090,7 +2201,451 @@ if (cs) cs.onclick = async () => {
 
 
 
-Promise.all([refresh(), loadStudio(), loadMedia()]).catch(e => { $("jobsLog").textContent = String(e); });
+
+// --- Character kit + procedural 3D / optional GLB ---
+let CHAR = null;
+let charStyle = "cartoon";
+let charSelectedGlb = null;
+let char3d = { renderer: null, scene: null, camera: null, mesh: null, root: null, raf: 0, mode: "none" };
+
+async function loadThree() {
+  if (window.THREE) return window.THREE;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js";
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return window.THREE;
+}
+
+async function loadGLTFLoader() {
+  if (window.GLTFLoader) return window.GLTFLoader;
+  // ESM loader attached onto window for classic script page
+  const mod = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js");
+  window.GLTFLoader = mod.GLTFLoader;
+  return window.GLTFLoader;
+}
+
+async function loadCharacters() {
+  CHAR = await api("/api/characters");
+  const prefs = CHAR.prefs || {};
+  charStyle = prefs.default_style || "cartoon";
+  charSelectedGlb = prefs.selected_glb || null;
+  if ($("charEnabled")) $("charEnabled").checked = prefs.enabled !== false;
+  const grid = $("charStyleGrid");
+  if (grid) {
+    const styles = CHAR.styles || {};
+    grid.innerHTML = Object.entries(styles).map(([k, v]) =>
+      `<button type="button" class="choice ${k===charStyle?"on":""}" data-cstyle="${k}"><strong>${LANG==="ru"?(v.label_ru||v.label):v.label}</strong><span class="sub">${v.note||""}</span></button>`
+    ).join("");
+  }
+  const sel = $("charGlbSelect");
+  if (sel) {
+    const glbs = CHAR.glb_avatars || [];
+    sel.innerHTML = `<option value="procedural">procedural bust</option>` +
+      glbs.map(g => `<option value="${g.rel}" ${charSelectedGlb===g.rel?"selected":""}>${g.name}</option>`).join("");
+    if (charSelectedGlb) sel.value = charSelectedGlb;
+  }
+  if ($("charGlbHint")) {
+    const glbs = CHAR.glb_avatars || [];
+    $("charGlbHint").textContent = glbs.length
+      ? ("GLB ready: " + glbs.map(g => g.name).join(", ") + " · TalkingHead lip-sync later")
+      : (CHAR.glb_hint || "assets/avatars/ empty — procedural only");
+  }
+  const rosterEl = $("charRoster");
+  if (rosterEl) {
+    const roster = CHAR.roster || {};
+    rosterEl.innerHTML = Object.entries(roster).map(([k, v]) =>
+      `<button type="button" class="pill ${LANG==="ru"?"cyan":"indigo"}" data-roster="${k}">${LANG==="ru"?(v.label_ru||v.label):v.label}</button>`
+    ).join("");
+  }
+  if ($("charLog")) log($("charLog"), { honesty: CHAR.honesty, style: charStyle, glb: charSelectedGlb || "procedural", viseme: CHAR.viseme_note });
+  initCharPreview();
+}
+
+$("charStyleGrid")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cstyle]");
+  if (!b) return;
+  charStyle = b.dataset.cstyle;
+  document.querySelectorAll("#charStyleGrid .choice").forEach(el => el.classList.toggle("on", el.dataset.cstyle === charStyle));
+  applyCharLook();
+});
+
+$("charGlbSelect")?.addEventListener("change", async () => {
+  const v = $("charGlbSelect").value;
+  charSelectedGlb = v === "procedural" ? null : v;
+  await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ selected_glb: charSelectedGlb || "procedural" }),
+  });
+  initCharPreview();
+});
+
+const btnSaveChars = $("btnSaveChars");
+if (btnSaveChars) btnSaveChars.onclick = async () => {
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      default_style: charStyle,
+      enabled: !!$("charEnabled")?.checked,
+      selected_glb: charSelectedGlb || "procedural",
+    }),
+  });
+  log($("charLog"), r);
+  toast(t("saveChars"));
+};
+const btnOpenAvatars = $("btnOpenAvatars");
+if (btnOpenAvatars) btnOpenAvatars.onclick = () => openPath("avatars");
+const btnCharPlate = $("btnCharPlate");
+if (btnCharPlate) btnCharPlate.onclick = async () => {
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "plate",
+      style: charStyle,
+      speaker: $("charSpeaker")?.value || "Hero",
+      emotion: $("charEmotion")?.value || "neutral",
+    }),
+  });
+  log($("charLog"), r);
+  if (r.rel) toast(r.rel);
+};
+
+let charSpeakTimer = null;
+$("charRoster")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-roster]");
+  if (!b || !CHAR?.roster) return;
+  const id = b.dataset.roster;
+  const meta = CHAR.roster[id];
+  if (!meta) return;
+  if ($("charSpeaker")) $("charSpeaker").value = LANG === "ru" ? (meta.label_ru || meta.label) : meta.label;
+  if (meta.style) {
+    charStyle = meta.style;
+    document.querySelectorAll("#charStyleGrid .choice").forEach(el => el.classList.toggle("on", el.dataset.cstyle === charStyle));
+  }
+  if (meta.default_emotion && $("charEmotion")) $("charEmotion").value = meta.default_emotion;
+  applyCharLook();
+  toast(meta.label_ru || meta.label);
+});
+
+function collectMorphNames(root) {
+  const names = [];
+  if (!root) return names;
+  root.traverse((obj) => {
+    if (obj.isMesh && obj.morphTargetDictionary) {
+      Object.keys(obj.morphTargetDictionary).forEach(n => names.push(n));
+    }
+  });
+  return [...new Set(names)];
+}
+
+function resetMorphs() {
+  (char3d.morphMeshes || []).forEach(({ mesh, dict }) => {
+    if (!mesh.morphTargetInfluences) return;
+    for (let i = 0; i < mesh.morphTargetInfluences.length; i++) mesh.morphTargetInfluences[i] = 0;
+  });
+}
+
+function applyMorphWeights(weights) {
+  if (!weights || !char3d.morphMeshes) return false;
+  let used = false;
+  resetMorphs();
+  Object.entries(weights).forEach(([name, w]) => {
+    (char3d.morphMeshes || []).forEach(({ mesh, dict }) => {
+      const idx = dict[name];
+      if (idx === undefined || !mesh.morphTargetInfluences) return;
+      mesh.morphTargetInfluences[idx] = w;
+      used = true;
+    });
+  });
+  return used;
+}
+
+function setMouthOpen(amount, morphWeights) {
+  const a = Math.max(0, Math.min(1, amount || 0));
+  const driven = applyMorphWeights(morphWeights || null);
+  if (char3d.mouth) {
+    char3d.mouth.scale.y = 0.25 + a * 1.4;
+    char3d.mouth.scale.x = 0.7 + a * 0.5;
+    char3d.mouth.position.y = -0.22 - a * 0.04;
+  }
+  // fallback for GLB without morphs
+  if (char3d.root && !driven && !char3d.mouth) {
+    char3d.root.scale.y = 1 + a * 0.02;
+  }
+  if ($("charMorphMeta") && char3d.morphNames) {
+    $("charMorphMeta").textContent = driven
+      ? ("morphs: " + Object.keys(morphWeights || {}).filter(k => (morphWeights||{})[k] > 0.01).join(", "))
+      : (char3d.morphNames.length ? ("morphs available: " + char3d.morphNames.length + " · no drive this frame") : "no morph targets — procedural mouth");
+  }
+}
+
+async function playVisemes(text) {
+  if (charSpeakTimer) { clearTimeout(charSpeakTimer); charSpeakTimer = null; }
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "visemes",
+      text,
+      morphs: char3d.morphNames || [],
+      emotion: $("charEmotion")?.value || "neutral",
+    }),
+  });
+  log($("charLog"), { visemes: (r.timeline||[]).length, morph_map: r.morph_map, honesty: r.honesty });
+  const timeline = r.timeline || [];
+  const t0 = performance.now();
+  const step = () => {
+    const elapsed = performance.now() - t0;
+    let open = 0;
+    let morphs = {};
+    for (let i = 0; i < timeline.length; i++) {
+      const v = timeline[i];
+      if (elapsed >= v.t_ms && elapsed < v.t_ms + v.dur_ms) {
+        open = v.open ?? 0; morphs = v.morphs || {}; break;
+      }
+      if (elapsed >= v.t_ms) { open = v.open ?? 0; morphs = v.morphs || {}; }
+    }
+    setMouthOpen(open, morphs);
+    if (elapsed < (timeline[timeline.length-1]?.t_ms || 0) + (timeline[timeline.length-1]?.dur_ms || 0) + 50) {
+      charSpeakTimer = setTimeout(step, 30);
+    } else {
+      setMouthOpen(0, {});
+      resetMorphs();
+      charSpeakTimer = null;
+    }
+  };
+  step();
+  try {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = LANG === "ru" ? "ru-RU" : "en-US";
+      u.rate = 1.0;
+      window.speechSynthesis.speak(u);
+    }
+  } catch (e) {}
+}
+
+const btnCharSpeak = $("btnCharSpeak");
+if (btnCharSpeak) btnCharSpeak.onclick = () => playVisemes($("charLine")?.value || $("charSpeaker")?.value || "hello");
+const btnCharStop = $("btnCharStop");
+if (btnCharStop) btnCharStop.onclick = () => {
+  if (charSpeakTimer) clearTimeout(charSpeakTimer);
+  charSpeakTimer = null;
+  try { window.speechSynthesis?.cancel(); } catch (e) {}
+  setMouthOpen(0, {});
+  if (typeof resetMorphs === "function") resetMorphs();
+};
+const btnCharDemo = $("btnCharDemo");
+if (btnCharDemo) btnCharDemo.onclick = async () => {
+  setTab("studio"); setWb("compose");
+  toast(t("charDemo"));
+  $("btnCartoon").click();
+};
+const btnCastPlates = $("btnCastPlates");
+if (btnCastPlates) btnCastPlates.onclick = async () => {
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action: "cast_plates", language: LANG }),
+  });
+  log($("charLog"), r);
+  toast((r.count || 0) + " plates → " + (r.dir || "out/characters/cast"));
+  if (r.sheet?.rel) toast(r.sheet.rel);
+};
+const btnCastReel = $("btnCastReel");
+if (btnCastReel) btnCastReel.onclick = async () => {
+  toast(t("castReel") + "…");
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "cast_reel",
+      language: LANG,
+      allow_network_tts: !!$("globalOnline")?.checked || !!$("onlineNet")?.checked,
+    }),
+  });
+  log($("charLog"), r);
+  if (r.rel) {
+    setPreview(r.rel, "cast reel");
+    setTab("overview");
+    toast(r.rel);
+  } else {
+    toast(r.error || "cast reel failed");
+  }
+};
+
+["charSpeaker","charEmotion"].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("change", applyCharLook);
+});
+
+function disposeChar3d() {
+  if (char3d.raf) cancelAnimationFrame(char3d.raf);
+  if (char3d.renderer) {
+    try { char3d.renderer.dispose(); } catch (e) {}
+  }
+  char3d = { renderer: null, scene: null, camera: null, mesh: null, root: null, mouth: null, morphMeshes: [], morphNames: [], raf: 0, mode: "none" };
+}
+
+async function applyCharLook() {
+  if (char3d.mode === "glb" && char3d.root) {
+    const emo = $("charEmotion")?.value || "neutral";
+    char3d.root.rotation.z = emo === "joy" ? 0.05 : emo === "sad" ? -0.04 : emo === "fear" ? 0.03 : 0;
+    if ((char3d.morphNames || []).length) {
+      try {
+        const r = await api("/api/characters", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ action: "emotion_morphs", emotion: emo, morphs: char3d.morphNames }),
+        });
+        applyMorphWeights(r.morphs || {});
+        if ($("charMorphMeta")) {
+          const keys = Object.keys(r.morphs || {}).filter(k => (r.morphs||{})[k] > 0.01);
+          $("charMorphMeta").textContent = keys.length
+            ? ("emotion morphs: " + keys.join(", "))
+            : ("emotion=" + emo + " · no matching ARKit morphs on GLB");
+        }
+      } catch (e) {}
+    }
+    return;
+  }
+  if (char3d.mode === "three" && char3d.mesh) {
+    const meta = (CHAR?.styles?.[charStyle]?.three) || { eyeScale: 1, mat: "toon" };
+    const skin = ({
+      cartoon: 0xffd6aa, anime: 0xffe0c8, mascot: 0xffa050, clay: 0xe8bea0,
+      realistic_stylized: 0xdcb496, off: 0xb4b4be
+    })[charStyle] || 0xffd6aa;
+    char3d.mesh.material.color.setHex(skin);
+    char3d.mesh.material.roughness = meta.mat === "clay" || meta.mat === "skin" ? 0.85 : 0.45;
+    char3d.mesh.material.metalness = 0.05;
+    const emo = $("charEmotion")?.value || "neutral";
+    char3d.mesh.rotation.z = emo === "joy" ? 0.08 : emo === "sad" ? -0.06 : 0;
+    char3d.mesh.scale.setScalar(meta.mat === "mascot" ? 1.12 : 1);
+  } else if (char3d.mode !== "glb") {
+    drawCharFallback();
+  }
+}
+
+function drawCharFallback() {
+  const canvas = $("charCanvas");
+  const fb = $("charFallback");
+  if (!canvas) return;
+  if (fb) fb.hidden = true;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth || 480;
+  const h = canvas.height = canvas.clientHeight || 340;
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0, "#1e1b4b"); g.addColorStop(1, "#0f172a");
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  const cx = w/2, cy = h*0.42, r = Math.min(w,h)*0.18;
+  const skins = {cartoon:"#ffd6aa",anime:"#ffe0c8",mascot:"#ffa050",clay:"#e8bea0",realistic_stylized:"#dcb496",off:"#b4b4be"};
+  ctx.fillStyle = "#3b82f6";
+  ctx.beginPath(); ctx.moveTo(cx-r*1.3, cy+r*0.8); ctx.lineTo(cx+r*1.3, cy+r*0.8); ctx.lineTo(cx+r*1.6, h); ctx.lineTo(cx-r*1.6, h); ctx.fill();
+  ctx.fillStyle = skins[charStyle] || "#ffd6aa";
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#222";
+  const es = ((CHAR?.styles?.[charStyle]?.three?.eyeScale) || 1.2) * r * 0.12;
+  ctx.beginPath(); ctx.arc(cx-r*0.35, cy-r*0.05, es, 0, Math.PI*2); ctx.arc(cx+r*0.35, cy-r*0.05, es, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = "600 16px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(($("charSpeaker")?.value || "Narrator") + " · " + charStyle, cx, h*0.9);
+  char3d.mode = "canvas2d";
+}
+
+function fitObject(root, THREE) {
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  root.position.sub(center);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const scale = 1.6 / maxDim;
+  root.scale.setScalar(scale);
+  root.position.y -= 0.15;
+}
+
+async function initCharPreview() {
+  const canvas = $("charCanvas");
+  const fb = $("charFallback");
+  if (!canvas) return;
+  disposeChar3d();
+  if (fb) { fb.hidden = false; fb.textContent = t("charFallback"); }
+  const glbRel = charSelectedGlb || ($("charGlbSelect")?.value !== "procedural" ? $("charGlbSelect")?.value : null);
+  try {
+    const THREE = await loadThree();
+    const w = canvas.clientWidth || 480, h = canvas.clientHeight || 340;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(w, h, false);
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, w/h, 0.1, 100);
+    camera.position.set(0, 0.35, 2.6);
+    scene.add(new THREE.HemisphereLight(0xbfdbfe, 0x1e293b, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 0.95);
+    key.position.set(2, 3, 2); scene.add(key);
+
+    if (glbRel && glbRel !== "procedural") {
+      const GLTFLoader = await loadGLTFLoader();
+      const loader = new GLTFLoader();
+      const url = "/api/media?path=" + encodeURIComponent(glbRel);
+      const gltf = await new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+      const root = gltf.scene || gltf.scenes?.[0];
+      fitObject(root, THREE);
+      scene.add(root);
+      const morphNames = collectMorphNames(root);
+      const morphMeshes = [];
+      root.traverse((obj) => {
+        if (obj.isMesh && obj.morphTargetDictionary && obj.morphTargetInfluences) {
+          morphMeshes.push({ mesh: obj, dict: obj.morphTargetDictionary });
+        }
+      });
+      char3d = { renderer, scene, camera, mesh: null, root, mouth: null, morphMeshes, morphNames, raf: 0, mode: "glb" };
+      if ($("charMorphMeta")) $("charMorphMeta").textContent = morphNames.length
+        ? ("GLB morphs: " + morphNames.slice(0, 12).join(", ") + (morphNames.length > 12 ? "…" : ""))
+        : "GLB has no morph targets — Speak uses scale fallback";
+      if (fb) fb.hidden = true;
+      applyCharLook();
+      const tick = (t) => {
+        root.rotation.y = Math.sin(t * 0.0007) * 0.45;
+        renderer.render(scene, camera);
+        char3d.raf = requestAnimationFrame(tick);
+      };
+      char3d.raf = requestAnimationFrame(tick);
+      if ($("charLog")) log($("charLog"), { preview: "glb", rel: glbRel, morphs: morphNames.length, note: "morph drive if Oculus/ARKit names present" });
+      return;
+    }
+
+    const geo = new THREE.SphereGeometry(0.55, 48, 48);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffd6aa, roughness: 0.4, metalness: 0.05 });
+    const head = new THREE.Mesh(geo, mat);
+    scene.add(head);
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a });
+    const eyeGeo = new THREE.SphereGeometry(0.09, 16, 16);
+    const e1 = new THREE.Mesh(eyeGeo, eyeMat); e1.position.set(-0.18, 0.08, 0.48);
+    const e2 = new THREE.Mesh(eyeGeo, eyeMat); e2.position.set(0.18, 0.08, 0.48);
+    head.add(e1); head.add(e2);
+    const mouthMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.6 });
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), mouthMat);
+    mouth.position.set(0, -0.22, 0.48);
+    mouth.scale.set(0.7, 0.25, 0.45);
+    head.add(mouth);
+    char3d = { renderer, scene, camera, mesh: head, root: null, mouth, morphMeshes: [], morphNames: [], raf: 0, mode: "three" };
+    if (fb) fb.hidden = true;
+    applyCharLook();
+    const tick = (t) => {
+      head.rotation.y = Math.sin(t * 0.001) * 0.35;
+      renderer.render(scene, camera);
+      char3d.raf = requestAnimationFrame(tick);
+    };
+    char3d.raf = requestAnimationFrame(tick);
+  } catch (err) {
+    if (fb) fb.hidden = true;
+    drawCharFallback();
+    if ($("charLog")) log($("charLog"), { three: "fallback_canvas2d", error: String(err.message || err) });
+  }
+}
+
+
+Promise.all([refresh(), loadStudio(), loadMedia(), loadCharacters()]).catch(e => { $("jobsLog").textContent = String(e); });
 </script>
 </body>
 </html>

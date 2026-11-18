@@ -277,6 +277,11 @@ def make_scene_clip(
     visual_query: str,
     provider: str = "synthetic",
     assets_dir: Path | None = None,
+    character_style: str | None = None,
+    speaker: str | None = None,
+    emotion: str | None = None,
+    gender: str | None = None,
+    use_character: bool = False,
 ) -> tuple[Path, AssetLicense]:
     """Resolve visuals with fallback chain; always returns a clip + license."""
     prov = (provider or "synthetic").lower()
@@ -312,6 +317,22 @@ def make_scene_clip(
                 return out_mp4, lic
             _fit_clip(src, out_mp4, duration_sec=duration_sec, width=width, height=height)
             return out_mp4, lic
+
+    if use_character and character_style and character_style != "off":
+        from content_engine.character_kit import make_character_clip
+
+        return make_character_clip(
+            out_mp4,
+            duration_sec=duration_sec,
+            width=width,
+            height=height,
+            fps=fps,
+            style=character_style,
+            speaker=speaker,
+            emotion=emotion,
+            gender=gender,
+            visual_query=visual_query,
+        )
 
     if prov in {"pexels", "auto", "stock"}:
         got = fetch_pexels_clip(

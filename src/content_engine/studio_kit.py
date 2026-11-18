@@ -62,6 +62,7 @@ TEMPLATES = {
         "color_grade": "warm",
         "motion": "none",
         "sfx": True,
+        "character_style": "cartoon",
         "inspired_by": "character Shorts (lower captions)",
     },
     "product_clean": {

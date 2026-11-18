@@ -11,6 +11,7 @@
       "id": "n1",
       "speaker": "narrator",
       "emotion": "calm",
+      "character_style": "cartoon",
       "text": "В тихом лесу кто-то шёл очень осторожно.",
       "visual_query": "cartoon forest soft light character silhouette"
     },
@@ -19,6 +20,7 @@
       "speaker": "Лиса",
       "gender": "female",
       "emotion": "whisper",
+      "character_style": "mascot",
       "text": "Ты слышишь? Кажется, рядом кто-то есть.",
       "visual_query": "cartoon fox character close-up forest"
     },
@@ -27,6 +29,7 @@
       "speaker": "Зайка",
       "gender": "child",
       "emotion": "fear",
+      "character_style": "anime",
       "text": "Мне страшно. Давай лучше спрячемся!",
       "visual_query": "cartoon bunny character scared forest"
     },
@@ -35,6 +38,7 @@
       "speaker": "Лиса",
       "gender": "female",
       "emotion": "joy",
+      "character_style": "mascot",
       "text": "Это же просто ветер! Смотри — как весело кружатся листья.",
       "visual_query": "cartoon fox happy leaves falling"
     },
@@ -42,6 +46,7 @@
       "id": "n2",
       "speaker": "narrator",
       "emotion": "warm",
+      "character_style": "cartoon",
       "text": "И друзья снова засмеялись — страхи растаяли в солнечном свете.",
       "visual_query": "cartoon friends sunshine forest ending"
     }

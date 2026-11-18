@@ -154,6 +154,28 @@ def run_pipeline(
         if voice_reason != "narrator":
             notes.append(f"voice[{scene.id}]={scene_voice} ({voice_reason})")
         clip = work / "clips" / f"{scene.id}.mp4"
+        from content_engine.character_kit import (
+            load_prefs as load_char_prefs,
+            resolve_style,
+            should_use_characters,
+        )
+
+        char_prefs = load_char_prefs()
+        brand_chars = brand.get("characters") or {}
+        style_key = resolve_style(
+            scene_style=scene.character_style,
+            script_style=script.visual_style,
+            brand_style=str(brand_chars.get("default_style") or "") or None,
+            prefs_style=str(char_prefs.get("default_style") or "") or None,
+            speaker=scene.speaker,
+        )
+        use_char = should_use_characters(
+            enabled=bool(brand_chars.get("enabled", char_prefs.get("enabled", True))),
+            style=style_key,
+            speaker=scene.speaker,
+            visual_style=script.visual_style,
+            tags=script.tags,
+        )
         _, lic = make_scene_clip(
             clip,
             duration_sec=dur,
@@ -163,7 +185,14 @@ def run_pipeline(
             visual_query=scene.visual_query,
             provider=provider,
             assets_dir=assets_dir if assets_dir.is_dir() else None,
+            character_style=style_key,
+            speaker=scene.speaker,
+            emotion=scene.emotion,
+            gender=scene.gender,
+            use_character=use_char,
         )
+        if use_char:
+            notes.append(f"character[{scene.id}]={style_key}")
         licenses.append(lic)
         timings.append(
             SceneTiming(

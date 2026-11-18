@@ -80,6 +80,9 @@ class OpsHandler(BaseHTTPRequestHandler):
         if path == "/api/studio":
             self._json(200, ops_api.action_studio_catalog())
             return
+        if path == "/api/characters":
+            self._json(200, ops_api.action_characters_catalog())
+            return
         if path == "/api/media/list":
             self._json(200, ops_api.action_media_list())
             return
@@ -214,6 +217,9 @@ class OpsHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/studio":
                 self._json(200, ops_api.action_studio_prefs(body if body else None))
+                return
+            if path == "/api/characters":
+                self._json(200, ops_api.action_characters_prefs(body if body else None))
                 return
             if path == "/api/media/upload":
                 import base64

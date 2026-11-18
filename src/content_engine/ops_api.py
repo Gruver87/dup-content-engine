@@ -60,6 +60,7 @@ def doctor_info() -> dict[str, Any]:
         "export": str(PACKAGE_ROOT / "out" / "export"),
         "montage": str(PACKAGE_ROOT / "out" / "montage"),
         "library": str(PACKAGE_ROOT / "assets" / "library"),
+        "avatars": str(PACKAGE_ROOT / "assets" / "avatars"),
         "honesty": "ALLOW ≠ growth; official APIs only — no cookie bots",
         "keys_present": {
             "tiktok": bool(os.environ.get("TIKTOK_CLIENT_KEY") and os.environ.get("TIKTOK_CLIENT_SECRET")),
@@ -82,6 +83,8 @@ def action_open_path(which: str) -> dict[str, Any]:
         "inbox": _inbox,
         "library": PACKAGE_ROOT / "assets" / "library",
         "fixtures": PACKAGE_ROOT / "fixtures",
+        "avatars": PACKAGE_ROOT / "assets" / "avatars",
+        "characters": PACKAGE_ROOT / "out" / "characters",
     }
     key = (which or "").strip().lower()
     target = mapping.get(key)
@@ -491,6 +494,86 @@ def action_normalize() -> dict[str, Any]:
 
 def action_jobs() -> dict[str, Any]:
     return {"ok": True, "jobs": read_jobs(limit=30)}
+
+
+def action_characters_catalog() -> dict[str, Any]:
+    from content_engine.character_kit import catalog
+
+    return catalog()
+
+
+def action_characters_prefs(patch: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.character_kit import load_prefs, preview_plate, save_prefs
+
+    if patch and patch.get("action") == "plate":
+        return preview_plate(
+            style=str(patch.get("style") or "cartoon"),
+            speaker=str(patch.get("speaker") or "Hero"),
+            emotion=str(patch.get("emotion") or "neutral"),
+        )
+    if patch and patch.get("action") == "cast_plates":
+        from content_engine.character_kit import build_cast_sheet, export_cast_plates
+
+        plates = export_cast_plates()
+        sheet = build_cast_sheet(plates=plates.get("plates"), language=str(patch.get("language") or "ru"))
+        return {**plates, "sheet": sheet}
+    if patch and patch.get("action") == "cast_reel":
+        from content_engine.character_kit import build_cast_reel
+
+        return build_cast_reel(
+            language=str(patch.get("language") or "ru"),
+            allow_network_tts=bool(patch.get("allow_network_tts", False)),
+        )
+    if patch and patch.get("action") == "visemes":
+        from content_engine.character_kit import (
+            merge_morph_weights,
+            morph_weights_for_emotion,
+            morph_weights_for_viseme,
+            resolve_emotion_morphs,
+            resolve_morph_targets,
+            text_to_visemes,
+            viseme_open_amount,
+        )
+
+        timeline = text_to_visemes(str(patch.get("text") or ""))
+        available = [str(x) for x in (patch.get("morphs") or [])]
+        emotion = str(patch.get("emotion") or "neutral")
+        morph_map = resolve_morph_targets(available) if available else {}
+        emotion_map = resolve_emotion_morphs(available) if available else {}
+        emo_w = morph_weights_for_emotion(emotion, emotion_map) if emotion_map else {}
+        frames = []
+        for x in timeline:
+            lip = morph_weights_for_viseme(x["viseme"], morph_map) if morph_map else {}
+            frames.append(
+                {
+                    **x,
+                    "open": viseme_open_amount(x["viseme"]),
+                    "morphs": merge_morph_weights(emo_w, lip),
+                }
+            )
+        return {
+            "ok": True,
+            "timeline": frames,
+            "opens": [f["open"] for f in frames],
+            "morph_map": morph_map,
+            "emotion": emotion,
+            "emotion_morphs": emo_w,
+            "honesty": "rule-based visemes+emotion morphs if GLB has Oculus/ARKit names — not full TalkingHead",
+        }
+    if patch and patch.get("action") == "emotion_morphs":
+        from content_engine.character_kit import morph_weights_for_emotion, resolve_emotion_morphs
+
+        available = [str(x) for x in (patch.get("morphs") or [])]
+        emotion_map = resolve_emotion_morphs(available)
+        return {
+            "ok": True,
+            "emotion": str(patch.get("emotion") or "neutral"),
+            "morphs": morph_weights_for_emotion(str(patch.get("emotion") or "neutral"), emotion_map),
+            "map": {k: [n for n, _ in v] for k, v in emotion_map.items()},
+        }
+    if patch:
+        return save_prefs(patch)
+    return {"ok": True, "prefs": load_prefs()}
 
 
 def action_studio_catalog() -> dict[str, Any]:

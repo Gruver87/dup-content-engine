@@ -19,6 +19,12 @@ music_volume = 0.10
 # music_mood from [studio] or prefs: calm|warm|soft|tension|hype|off
 # music_file = "assets/music/bed.mp3"
 
+# Local Character Kit — stylized plates + console 3D preview (NOT HeyGen photoreal)
+[characters]
+enabled = true
+default_style = "cartoon"   # off|cartoon|anime|mascot|clay|realistic_stylized
+# Drop Mixamo+viseme .glb into assets/avatars/ for future TalkingHead slot
+
 # Pro polish pack (CapCut/Descript/DaVinci-class via ffmpeg — not generative video AI)
 [studio]
 template = "social_default"   # social_default|cartoon_dialog|product_clean|dramatic|hype_hook
