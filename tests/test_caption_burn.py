@@ -27,8 +27,13 @@ def test_burn_on_tiny_clip(tmp_path: Path):
     )
     out = tmp_path / "cap.mp4"
     path, method = burn_scene_caption(
-        src, "Hello DUP captions", out, width=320, height=568
+        src,
+        "If evidence is missing, the honest answer is stop — not fake confidence.",
+        out,
+        width=320,
+        height=568,
+        style_name="boxed",
     )
     assert path.is_file()
-    assert method in {"pillow_overlay"} or method.startswith("drawtext")
-    assert find_font() is not None or method == "pillow_overlay"
+    assert method.startswith("pillow_overlay") or method.startswith("drawtext")
+    assert find_font() is not None or "pillow" in method

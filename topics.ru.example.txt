@@ -1,0 +1,11 @@
+# Русские темы — одна строка = один шортс.
+# Запуск: python -m content_engine day topics.ru.example.txt --language ru
+
+Почему тихий зелёный статус врёт
+Три признака, что автоматизация врёт
+Медиа-пайплайн на ноутбуке без GPU
+Что edge-TTS и FFmpeg дают для Shorts
+Что значит fail-closed для Agent Skills
+MCP-серверы, которые можно проверить
+Почему evidence-pack сильнее маркетинговых скриншотов
+dup-lab bootstrap за минуту

@@ -173,9 +173,15 @@ def build_parser() -> argparse.ArgumentParser:
     series.add_argument("--variants", default="A,B")
     series.add_argument("--pick", choices=["best", "all"], default="best")
     series.add_argument("--scripts-only", action="store_true")
-    series.add_argument("--online-tts", action="store_true")
+    series.add_argument(
+        "--offline-tts",
+        action="store_true",
+        help="Tone bed instead of spoken edge-tts (CI/no network)",
+    )
+    series.add_argument("--language", default="en", help="en|ru script+voice")
+    series.add_argument("--no-finish", action="store_true", help="Skip copy/bundle after ALLOW")
 
-    day = sub.add_parser("day", help="Alias: series --limit 1 (today's offline short)")
+    day = sub.add_parser("day", help="Alias: series --limit 1 (spoken Short + captions)")
     day.add_argument(
         "topics",
         type=Path,
@@ -185,7 +191,13 @@ def build_parser() -> argparse.ArgumentParser:
     day.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "series")
     day.add_argument("--variants", default="A,B")
     day.add_argument("--scripts-only", action="store_true")
-    day.add_argument("--online-tts", action="store_true")
+    day.add_argument(
+        "--offline-tts",
+        action="store_true",
+        help="Tone bed instead of spoken edge-tts",
+    )
+    day.add_argument("--language", default="en", help="en|ru script+voice")
+    day.add_argument("--no-finish", action="store_true", help="Skip copy/bundle after ALLOW")
 
     abr = sub.add_parser("ab-report", help="Build HTML A/B report from SERIES.json")
     abr.add_argument("series_json", type=Path)
@@ -193,7 +205,126 @@ def build_parser() -> argparse.ArgumentParser:
     jobs = sub.add_parser("jobs", help="Show recent local jobs.jsonl entries")
     jobs.add_argument("--limit", type=int, default=20)
 
+    copy_p = sub.add_parser(
+        "copy",
+        help="Offline titles/captions/hashtags for manual upload (no keys)",
+    )
+    copy_p.add_argument("--script", type=Path, default=None)
+    copy_p.add_argument("--pack", type=Path, default=None)
+    copy_p.add_argument(
+        "--out",
+        type=Path,
+        default=PACKAGE_ROOT / "out" / "copy" / "COPY.json",
+    )
+    copy_p.add_argument("--brand", type=Path, default=DEFAULT_BRAND)
+
+    bun = sub.add_parser(
+        "bundle",
+        help="Ship folder/zip of ALLOW mp4+pack(+srt/thumb/copy) for manual upload",
+    )
+    bun.add_argument("mp4", type=Path)
+    bun.add_argument("--pack", type=Path, required=True)
+    bun.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "ship")
+    bun.add_argument("--srt", type=Path, default=None)
+    bun.add_argument("--thumb", type=Path, default=None)
+    bun.add_argument("--script", type=Path, default=None)
+    bun.add_argument("--no-zip", action="store_true")
+    bun.add_argument("--with-copy", action="store_true", help="Generate COPY.json into bundle")
+
+    icn = sub.add_parser("icon", help="Write local brand icon PNG (default 1024×1024)")
+    icn.add_argument(
+        "--out",
+        type=Path,
+        default=PACKAGE_ROOT / "out" / "brand" / "icon_1024.png",
+    )
+    icn.add_argument("--size", type=int, default=1024)
+    icn.add_argument("--brand", type=Path, default=DEFAULT_BRAND)
+    icn.add_argument("--solid", action="store_true", help="Flat accent fill (no rounded tile)")
+
+    norm = sub.add_parser("normalize", help="Optional loudnorm pass on an mp4 (no keys)")
+    norm.add_argument("mp4", type=Path)
+    norm.add_argument("--out", type=Path, default=None)
+    norm.add_argument("--lufs", type=float, default=-14.0)
+
+    styles = sub.add_parser("styles", help="List offline caption style presets")
+    styles.add_argument("--json", action="store_true")
+
+    sub.add_parser("status", help="Local audit/jobs digest (never invents views)")
+
+    ch = sub.add_parser("chapters", help="Paste-ready YouTube chapters from script/SRT")
+    ch.add_argument("--script", type=Path, default=None)
+    ch.add_argument("--srt", type=Path, default=None)
+    ch.add_argument(
+        "--out",
+        type=Path,
+        default=PACKAGE_ROOT / "out" / "chapters" / "CHAPTERS.json",
+    )
+
+    ib = sub.add_parser(
+        "inbox",
+        help="Process inbox/*.json scripts offline (move to done/refuse)",
+    )
+    ib.add_argument(
+        "--dir",
+        type=Path,
+        default=PACKAGE_ROOT / "inbox",
+        help="Inbox folder (default: ./inbox)",
+    )
+    ib.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "inbox")
+    ib.add_argument("--limit", type=int, default=None)
+    ib.add_argument(
+        "--offline-tts",
+        action="store_true",
+        help="Tone bed instead of spoken edge-tts",
+    )
+    ib.add_argument("--dry-run", action="store_true", help="List pending only")
+    ib.add_argument("--no-finish", action="store_true", help="Skip copy/bundle after ALLOW")
+
+    ready = sub.add_parser("ready", help="Checklist: mp4+pack ALLOW ready for manual ship")
+    ready.add_argument("--mp4", type=Path, default=None)
+    ready.add_argument("--pack", type=Path, default=None)
+    ready.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "demo")
+
+    fin = sub.add_parser("finish", help="ALLOW → copy + ship zip + ready (no auto-post)")
+    fin.add_argument("mp4", type=Path)
+    fin.add_argument("--pack", type=Path, required=True)
+    fin.add_argument("--script", type=Path, default=None)
+    fin.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "ship")
+    fin.add_argument("--loudnorm", action="store_true")
+
+    sub.add_parser(
+        "tiktok-refresh",
+        help="Refresh TIKTOK_ACCESS_TOKEN via TIKTOK_REFRESH_TOKEN (official)",
+    )
+
+    ideas = sub.add_parser(
+        "ideas",
+        help="Suggest Short topics (offline + optional Google Trends RSS; not virality)",
+    )
+    ideas.add_argument("--language", default="en", help="en|ru")
+    ideas.add_argument("--geo", default="US", help="Google Trends geo when language!=ru")
+    ideas.add_argument("--limit", type=int, default=8)
+    ideas.add_argument("--niche", type=str, default=None)
+    ideas.add_argument("--offline", action="store_true", help="Skip online trends fetch")
+    ideas.add_argument(
+        "--out",
+        type=Path,
+        default=PACKAGE_ROOT / "out" / "ideas" / "topics.ideas.txt",
+    )
+    ideas.add_argument(
+        "--run-day",
+        action="store_true",
+        help="After ideas: run day on the generated topics file (scripts+render)",
+    )
+
     sub.add_parser("doctor", help="Show toolchain + paths")
+    cons = sub.add_parser(
+        "console",
+        help="Local ops console (browser) — studio / inbox / library / ship",
+    )
+    cons.add_argument("--host", default="127.0.0.1")
+    cons.add_argument("--port", type=int, default=8765)
+    cons.add_argument("--no-open", action="store_true", help="Do not open browser")
     return p
 
 
@@ -213,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
             "policy": str(DEFAULT_POLICY),
             "brand": str(DEFAULT_BRAND),
             "assets": str(PACKAGE_ROOT / "assets"),
+            "inbox": str(PACKAGE_ROOT / "inbox"),
+            "caption_style_hint": "configs/brand.toml [captions].style = clean|boxed|bold",
             "note": "ALLOW ≠ growth; TikTok/YT/IG official APIs only — no cookie bots",
         }
         print(json.dumps(info, indent=2))
@@ -496,8 +629,10 @@ def main(argv: list[str] | None = None) -> int:
             limit=limit,
             variants=variants,
             pick="best" if args.cmd == "day" else getattr(args, "pick", "best"),
-            offline_tts=not args.online_tts,
+            offline_tts=bool(getattr(args, "offline_tts", False)),
             scripts_only=args.scripts_only,
+            language=getattr(args, "language", "en"),
+            finish=not getattr(args, "no_finish", False),
         )
         print(json.dumps(summary, indent=2))
         return 0 if summary.get("allow_count", 0) > 0 or args.scripts_only else 1
@@ -517,6 +652,197 @@ def main(argv: list[str] | None = None) -> int:
 
         rows = read_jobs(limit=args.limit)
         print(json.dumps({"count": len(rows), "jobs": rows}, indent=2))
+        return 0
+
+    if args.cmd == "copy":
+        from content_engine.brand import load_brand
+        from content_engine.copydesk import copy_from_paths
+
+        result = copy_from_paths(
+            script_path=args.script,
+            pack_path=args.pack,
+            brand=load_brand(args.brand),
+            out_path=args.out,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "bundle":
+        from content_engine.brand import load_brand
+        from content_engine.bundle import build_bundle
+        from content_engine.copydesk import copy_from_paths
+
+        if not args.mp4.is_file():
+            print(f"mp4 missing: {args.mp4}", file=sys.stderr)
+            return 2
+        copy_json = None
+        if args.with_copy:
+            copy_out = args.out / "_copy_tmp" / "COPY.json"
+            c = copy_from_paths(
+                script_path=args.script,
+                pack_path=args.pack,
+                brand=load_brand(DEFAULT_BRAND),
+                out_path=copy_out,
+            )
+            if c.get("ok"):
+                copy_json = copy_out
+        result = build_bundle(
+            args.mp4,
+            pack_path=args.pack,
+            out_dir=args.out,
+            srt=args.srt,
+            thumb=args.thumb,
+            script_path=args.script,
+            copy_json=copy_json,
+            zip_it=not args.no_zip,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "icon":
+        from content_engine.brand import load_brand
+        from content_engine.icon import make_icon
+
+        result = make_icon(
+            args.out,
+            brand=load_brand(args.brand),
+            size=args.size,
+            solid=args.solid,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "normalize":
+        from content_engine.loudnorm import normalize_mp4
+
+        if not args.mp4.is_file():
+            print(f"mp4 missing: {args.mp4}", file=sys.stderr)
+            return 2
+        result = normalize_mp4(args.mp4, out=args.out, integrated_lufs=args.lufs)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "styles":
+        from content_engine.caption_styles import STYLES, list_styles
+
+        if args.json:
+            print(json.dumps({"styles": list_styles(), "detail": STYLES}, indent=2))
+        else:
+            print("\n".join(list_styles()))
+        return 0
+
+    if args.cmd == "status":
+        from content_engine.status_digest import build_status
+
+        print(json.dumps(build_status(), indent=2))
+        return 0
+
+    if args.cmd == "chapters":
+        from content_engine.chapters import build_chapters
+
+        script = None
+        if args.script and args.script.is_file():
+            script = load_script(args.script)
+        result = build_chapters(script, srt_path=args.srt, out_path=args.out)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "inbox":
+        from content_engine.inbox import process_inbox
+
+        result = process_inbox(
+            args.dir,
+            out_dir=args.out,
+            offline_tts=bool(args.offline_tts),
+            limit=args.limit,
+            dry_run=args.dry_run,
+            finish=not args.no_finish,
+        )
+        print(json.dumps(result, indent=2))
+        if args.dry_run:
+            return 0
+        return 0 if result.get("processed", 0) == 0 or result.get("allow_count", 0) > 0 else 1
+
+    if args.cmd == "ready":
+        from content_engine.ready_check import check_ready
+
+        result = check_ready(mp4=args.mp4, pack_path=args.pack, out_dir=args.out)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ready") else 1
+
+    if args.cmd == "finish":
+        from content_engine.finish_kit import finish_allow_run
+
+        if not args.mp4.is_file():
+            print(f"mp4 missing: {args.mp4}", file=sys.stderr)
+            return 2
+        result = finish_allow_run(
+            args.mp4,
+            args.pack,
+            script_path=args.script,
+            ship_dir=args.out,
+            loudnorm=args.loudnorm,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "tiktok-refresh":
+        from content_engine.tiktok_auth import refresh_access_token
+
+        result = refresh_access_token(persist=True)
+        # Never print raw tokens
+        if result.get("ok"):
+            safe = {
+                "ok": True,
+                "access_token_len": result.get("access_token_len"),
+                "access_token_last4": result.get("access_token_last4"),
+                "expires_in": result.get("expires_in"),
+                "refresh_rotated": result.get("refresh_rotated"),
+                "persisted": result.get("persisted"),
+                "note": result.get("note"),
+            }
+        else:
+            safe = result
+        print(json.dumps(safe, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "ideas":
+        from content_engine.trends import suggest_ideas
+
+        result = suggest_ideas(
+            language=args.language,
+            geo=args.geo,
+            limit=args.limit,
+            online=not args.offline,
+            niche=args.niche,
+            out_path=args.out,
+        )
+        print(json.dumps(result, indent=2))
+        if not result.get("ok"):
+            return 1
+        if args.run_day:
+            from content_engine.series import run_series
+
+            topics = Path(result["topics_file"])
+            summary = run_series(
+                topics,
+                out_dir=PACKAGE_ROOT / "out" / "series",
+                limit=1,
+                variants=["A", "B"],
+                pick="best",
+                offline_tts=False,
+                scripts_only=False,
+                language=args.language,
+                finish=True,
+            )
+            print(json.dumps({"day": summary}, indent=2))
+            return 0 if summary.get("allow_count", 0) > 0 else 1
+        return 0
+
+    if args.cmd == "console":
+        from content_engine.ops_server import serve
+
+        serve(host=args.host, port=args.port, open_browser=not args.no_open)
         return 0
 
     return 2

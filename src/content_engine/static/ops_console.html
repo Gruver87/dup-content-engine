@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DUP Ops Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root, [data-theme="light"] {
+  --bg0: #e7eef6;
+  --bg1: #f5f8fc;
+  --ink: #0d1b2a;
+  --muted: #5a6b7d;
+  --line: #c5d0dc;
+  --panel: rgba(255,255,255,0.82);
+  --panel-solid: #ffffff;
+  --side: rgba(255,255,255,0.62);
+  --accent: #1f6feb;
+  --accent2: #0a4d8c;
+  --ok: #1a7f4b;
+  --bad: #b42318;
+  --warn: #9a6700;
+  --shadow: 0 18px 50px rgba(13,27,42,0.09);
+  --grid: rgba(13,27,42,0.045);
+  --glow: rgba(31,111,235,0.22);
+  --nav-hover: rgba(31,111,235,0.08);
+  --log-bg: #0d1b2a;
+  --log-fg: #d7e3f4;
+  --chrome: #fff;
+}
+[data-theme="dark"] {
+  --bg0: #070b12;
+  --bg1: #0f1622;
+  --ink: #e8eef7;
+  --muted: #93a4b8;
+  --line: #243247;
+  --panel: rgba(18,26,40,0.88);
+  --panel-solid: #121a28;
+  --side: rgba(10,15,24,0.92);
+  --accent: #4c8dff;
+  --accent2: #1f6feb;
+  --ok: #3dd68c;
+  --bad: #ff7b72;
+  --warn: #e3b341;
+  --shadow: 0 18px 50px rgba(0,0,0,0.45);
+  --grid: rgba(255,255,255,0.035);
+  --glow: rgba(76,141,255,0.28);
+  --nav-hover: rgba(76,141,255,0.12);
+  --log-bg: #060a11;
+  --log-fg: #c9d7ea;
+  --chrome: #121a28;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: "Sora", system-ui, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 560px at 8% -8%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+    radial-gradient(900px 480px at 100% 0%, color-mix(in srgb, #7cb87a 14%, transparent), transparent 48%),
+    linear-gradient(165deg, var(--bg0), var(--bg1));
+  transition: background .25s ease, color .2s ease;
+}
+body::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; opacity: 1;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.app {
+  display: grid;
+  grid-template-columns: 252px 1fr;
+  min-height: 100vh;
+  position: relative;
+}
+.side {
+  padding: 18px 14px;
+  border-right: 1px solid var(--line);
+  background: var(--side);
+  backdrop-filter: blur(14px);
+  position: sticky; top: 0; height: 100vh;
+  display: flex; flex-direction: column;
+}
+.brand {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px 18px;
+}
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: linear-gradient(145deg, var(--accent), var(--accent2));
+  color: #fff; display: grid; place-items: center;
+  font-weight: 700; letter-spacing: -0.04em; box-shadow: 0 10px 24px var(--glow);
+}
+.brand b { font-size: 1.2rem; letter-spacing: -0.03em; display: block; line-height: 1.1; }
+.brand span { font-size: 0.72rem; color: var(--muted); }
+.chrome {
+  display: flex; gap: 6px; padding: 0 8px 14px;
+}
+.chrome button, .icon-btn {
+  appearance: none; border: 1px solid var(--line); background: var(--chrome);
+  color: var(--ink); width: 36px; height: 36px; border-radius: 10px;
+  cursor: pointer; display: grid; place-items: center; font-size: 1rem;
+  transition: background .15s, border-color .15s, opacity .15s;
+}
+.chrome button:hover:not(:disabled), .icon-btn:hover { border-color: var(--accent); }
+.chrome button:disabled { opacity: 0.35; cursor: default; }
+.nav { display: flex; flex-direction: column; gap: 3px; }
+.nav button {
+  appearance: none; border: 0; background: transparent;
+  text-align: left; padding: 11px 12px; border-radius: 11px;
+  font: inherit; font-weight: 500; color: var(--ink); cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+}
+.nav button .ni {
+  width: 22px; text-align: center; font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem; color: var(--muted);
+}
+.nav button:hover { background: var(--nav-hover); }
+.nav button.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; box-shadow: 0 8px 20px var(--glow);
+}
+.nav button.active .ni { color: rgba(255,255,255,0.85); }
+.side-foot {
+  margin-top: auto; padding: 12px 8px 4px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-solid);
+}
+.seg button {
+  appearance: none; border: 0; background: transparent; border-radius: 9px;
+  padding: 8px 6px; font: inherit; font-size: 0.78rem; font-weight: 600;
+  color: var(--muted); cursor: pointer;
+}
+.seg button.on {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+}
+.hint {
+  font-size: 0.68rem; color: var(--muted); line-height: 1.45;
+  font-family: "IBM Plex Mono", monospace; padding: 4px 4px 8px;
+}
+.main { padding: 18px 24px 40px; min-width: 0; }
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  justify-content: space-between; margin-bottom: 16px;
+}
+.crumbs {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.crumb {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+  padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel-solid); color: var(--muted);
+}
+.crumb.now { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.top-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.badge {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.75rem;
+  padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel-solid);
+}
+.badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+.badge.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.headline h1 { margin: 0; font-size: 1.55rem; letter-spacing: -0.03em; }
+.headline p { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+.grid { display: grid; gap: 14px; }
+.grid.metrics { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.grid.two { grid-template-columns: 1.15fr 0.85fr; }
+.grid.tools { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; box-shadow: var(--shadow);
+  padding: 16px; backdrop-filter: blur(10px);
+}
+.card h3 { margin: 0 0 8px; font-size: 0.95rem; }
+.card .val { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.04em; }
+.card .sub { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+.panel { display: none; }
+.panel.active { display: block; animation: rise .28s ease; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+label.field { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+input, select, textarea {
+  font: inherit; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 11px; padding: 10px 12px; background: var(--panel-solid); min-width: 180px;
+}
+textarea { min-height: 140px; width: 100%; font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; }
+button.btn {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600;
+  border-radius: 11px; padding: 11px 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; box-shadow: 0 10px 22px var(--glow);
+}
+button.btn:hover { filter: brightness(1.06); }
+button.btn.ghost {
+  background: var(--panel-solid); color: var(--ink); border: 1px solid var(--line); box-shadow: none;
+}
+button.btn:disabled { opacity: 0.55; cursor: wait; }
+.phone {
+  width: min(280px, 100%); aspect-ratio: 9/16; margin: 0 auto;
+  border-radius: 28px; border: 10px solid #0d1b2a; background: #000;
+  overflow: hidden; box-shadow: var(--shadow);
+}
+[data-theme="dark"] .phone { border-color: #000; }
+.phone video { width: 100%; height: 100%; object-fit: cover; background: #111; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.list li {
+  display: flex; gap: 10px; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-solid);
+  font-size: 0.86rem; cursor: pointer;
+}
+.list li.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.list .mini { display: flex; gap: 4px; flex-wrap: wrap; }
+.list .mini button { font-size: 0.72rem; padding: 5px 8px; }
+.ship-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px; margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: 16px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 12%, var(--panel-solid)),
+    var(--panel-solid));
+  box-shadow: var(--shadow);
+}
+.ship-bar .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ship-bar .btn.primary {
+  min-width: 132px; font-size: 0.95rem; padding: 12px 18px;
+}
+.ship-bar .btn.send {
+  background: linear-gradient(135deg, #0f9d58, #0a7a44);
+  box-shadow: 0 10px 22px rgba(15,157,88,0.28);
+}
+.ship-bar .hint-line {
+  font-size: 0.78rem; color: var(--muted); max-width: 340px; line-height: 1.35;
+}
+.mono { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; }
+.log {
+  max-height: 280px; overflow: auto; background: var(--log-bg); color: var(--log-fg);
+  border-radius: 12px; padding: 12px; font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem; white-space: pre-wrap;
+}
+.drop {
+  border: 2px dashed color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 14px; padding: 28px; text-align: center;
+  background: color-mix(in srgb, var(--panel-solid) 80%, transparent); color: var(--muted);
+}
+.drop.drag { border-color: var(--accent); color: var(--ink); background: var(--nav-hover); }
+.tool {
+  cursor: pointer; transition: transform .15s ease, box-shadow .15s ease;
+  min-height: 128px;
+}
+.tool:hover { transform: translateY(-2px); box-shadow: 0 16px 36px var(--shadow); }
+.tool .ico {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--nav-hover); color: var(--accent2); font-weight: 700; margin-bottom: 10px;
+  font-family: "IBM Plex Mono", monospace; font-size: 0.85rem;
+}
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.86rem; margin: 6px 0; }
+.check .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: 0 0 auto; }
+.check.ok .dot { background: var(--ok); }
+.check.bad .dot { background: var(--bad); }
+.toast {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; box-shadow: var(--shadow); max-width: 320px;
+  font-size: 0.86rem; display: none;
+}
+.toast.show { display: block; animation: rise .25s ease; }
+.workbench-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px;
+  padding: 4px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--panel-solid); width: fit-content; max-width: 100%;
+}
+.workbench-tabs button {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--muted);
+  padding: 9px 14px; border-radius: 10px;
+}
+.workbench-tabs button.on {
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
+}
+.wb { display: none; }
+.wb.on { display: block; animation: rise .22s ease; }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.choice {
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+  background: var(--panel-solid); cursor: pointer; text-align: left;
+  font: inherit; color: var(--ink); transition: border-color .15s, box-shadow .15s;
+}
+.choice:hover { border-color: var(--accent); }
+.choice.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.choice b { display: block; font-size: 0.88rem; margin-bottom: 4px; }
+.choice span { display: block; font-size: 0.72rem; color: var(--muted); line-height: 1.35; }
+.section-label {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+  color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase;
+  margin: 18px 0 10px;
+}
+.tools-cat { margin-bottom: 8px; }
+@media (max-width: 1100px) {
+  .grid.tools { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+@media (max-width: 980px) {
+  .app { grid-template-columns: 1fr; }
+  .side { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .nav { flex-direction: row; flex-wrap: wrap; }
+  .grid.metrics, .grid.two, .grid.tools { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .grid.metrics, .grid.two, .grid.tools { grid-template-columns: 1fr; }
+}
+
+/* === Dup Console visual upgrade v0.1.19 === */
+
+.gap-scan {
+  margin: 0 0 14px; padding: 12px 14px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--scan, var(--c-amber)) 40%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--scan, var(--c-amber)) 14%, transparent), transparent 60%),
+    var(--panel-solid);
+}
+.gap-scan h4 { margin: 0 0 6px; font-size: 0.92rem; }
+.gap-scan .sub { margin: 0 0 10px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font-size: 0.72rem; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid transparent; letter-spacing: 0.01em;
+}
+.chip.have {
+  color: #064e3b; background: color-mix(in srgb, var(--c-mint) 28%, #fff);
+  border-color: color-mix(in srgb, var(--c-mint) 45%, transparent);
+}
+[data-theme="dark"] .chip.have { color: #d1fae5; background: color-mix(in srgb, var(--c-mint) 22%, #000); }
+.chip.miss {
+  color: #7c2d12; background: color-mix(in srgb, var(--c-orange) 28%, #fff);
+  border-color: color-mix(in srgb, var(--c-orange) 45%, transparent);
+}
+[data-theme="dark"] .chip.miss { color: #ffedd5; background: color-mix(in srgb, var(--c-orange) 22%, #000); }
+.chip.soon {
+  color: #1e3a8a; background: color-mix(in srgb, var(--c-sky) 28%, #fff);
+  border-color: color-mix(in srgb, var(--c-sky) 45%, transparent);
+}
+[data-theme="dark"] .chip.soon { color: #dbeafe; background: color-mix(in srgb, var(--c-sky) 22%, #000); }
+.gap-scan.sky { --scan: var(--c-sky); }
+.gap-scan.indigo { --scan: var(--c-indigo); }
+.gap-scan.orange { --scan: var(--c-orange); }
+.gap-scan.cyan { --scan: var(--c-cyan); }
+.gap-scan.amber { --scan: var(--c-amber); }
+.gap-scan.coral { --scan: var(--c-coral); }
+.gap-scan.lime { --scan: var(--c-lime); }
+.gap-scan.mint { --scan: var(--c-mint); }
+.grid.tools .card.tool { position: relative; overflow: hidden; }
+.grid.tools .card.tool::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 3px;
+  background: linear-gradient(90deg, var(--c-lime), var(--c-cyan), var(--c-amber));
+}
+.grid.tools .card.tool:nth-child(3n+1)::after { background: linear-gradient(90deg, var(--c-sky), var(--c-indigo)); }
+.grid.tools .card.tool:nth-child(3n+2)::after { background: linear-gradient(90deg, var(--c-coral), var(--c-orange)); }
+.grid.tools .card.tool:nth-child(3n)::after { background: linear-gradient(90deg, var(--c-mint), var(--c-lime)); }
+.aspect-on { outline: 2px solid #fff; box-shadow: 0 0 0 3px var(--c-indigo); }
+
+:root, [data-theme="light"] {
+  --c-sky: #0ea5e9; --c-sky2: #0369a1;
+  --c-mint: #10b981; --c-mint2: #047857;
+  --c-amber: #f59e0b; --c-amber2: #b45309;
+  --c-coral: #f43f5e; --c-coral2: #be123c;
+  --c-lime: #84cc16; --c-lime2: #4d7c0f;
+  --c-cyan: #06b6d4; --c-cyan2: #0e7490;
+  --c-indigo: #6366f1; --c-indigo2: #4338ca;
+  --c-orange: #fb923c; --c-orange2: #c2410c;
+}
+[data-theme="dark"] {
+  --c-sky: #38bdf8; --c-sky2: #0ea5e9;
+  --c-mint: #34d399; --c-mint2: #10b981;
+  --c-amber: #fbbf24; --c-amber2: #f59e0b;
+  --c-coral: #fb7185; --c-coral2: #f43f5e;
+  --c-lime: #a3e635; --c-lime2: #84cc16;
+  --c-cyan: #22d3ee; --c-cyan2: #06b6d4;
+  --c-indigo: #818cf8; --c-indigo2: #6366f1;
+  --c-orange: #fdba74; --c-orange2: #fb923c;
+}
+body {
+  background:
+    radial-gradient(900px 500px at 0% 0%, color-mix(in srgb, var(--c-sky) 22%, transparent), transparent 50%),
+    radial-gradient(800px 420px at 100% 5%, color-mix(in srgb, var(--c-amber) 16%, transparent), transparent 48%),
+    radial-gradient(700px 400px at 70% 100%, color-mix(in srgb, var(--c-mint) 14%, transparent), transparent 50%),
+    linear-gradient(165deg, var(--bg0), var(--bg1)) !important;
+}
+.nav button { position: relative; overflow: hidden; }
+.nav button::before {
+  content: ""; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--muted));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot, transparent) 25%, transparent);
+}
+.nav button .ni { margin-left: 10px; }
+.nav button[data-c="sky"] { --dot: var(--c-sky); }
+.nav button[data-c="indigo"] { --dot: var(--c-indigo); }
+.nav button[data-c="orange"] { --dot: var(--c-orange); }
+.nav button[data-c="cyan"] { --dot: var(--c-cyan); }
+.nav button[data-c="amber"] { --dot: var(--c-amber); }
+.nav button[data-c="coral"] { --dot: var(--c-coral); }
+.nav button[data-c="lime"] { --dot: var(--c-lime); }
+.nav button[data-c="mint"] { --dot: var(--c-mint); }
+.nav button[data-c="sky"].active { background: linear-gradient(135deg, var(--c-sky), var(--c-sky2)); }
+.nav button[data-c="indigo"].active { background: linear-gradient(135deg, var(--c-indigo), var(--c-indigo2)); }
+.nav button[data-c="orange"].active { background: linear-gradient(135deg, var(--c-orange), var(--c-orange2)); }
+.nav button[data-c="cyan"].active { background: linear-gradient(135deg, var(--c-cyan), var(--c-cyan2)); }
+.nav button[data-c="amber"].active { background: linear-gradient(135deg, var(--c-amber), var(--c-amber2)); }
+.nav button[data-c="coral"].active { background: linear-gradient(135deg, var(--c-coral), var(--c-coral2)); }
+.nav button[data-c="lime"].active { background: linear-gradient(135deg, var(--c-lime), var(--c-lime2)); }
+.nav button[data-c="mint"].active { background: linear-gradient(135deg, var(--c-mint), var(--c-mint2)); }
+.card { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card:hover { transform: translateY(-1px); }
+.card.glow-sky { border-color: color-mix(in srgb, var(--c-sky) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-sky) 18%, transparent); }
+.card.glow-mint { border-color: color-mix(in srgb, var(--c-mint) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-mint) 18%, transparent); }
+.card.glow-amber { border-color: color-mix(in srgb, var(--c-amber) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-amber) 18%, transparent); }
+.card.glow-coral { border-color: color-mix(in srgb, var(--c-coral) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-coral) 18%, transparent); }
+.card.glow-indigo { border-color: color-mix(in srgb, var(--c-indigo) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-indigo) 18%, transparent); }
+.card.glow-orange { border-color: color-mix(in srgb, var(--c-orange) 45%, var(--line)); box-shadow: 0 12px 30px color-mix(in srgb, var(--c-orange) 18%, transparent); }
+.metric-top { height: 4px; border-radius: 999px; margin: -6px 0 10px; }
+.metric-top.sky { background: linear-gradient(90deg, var(--c-sky), transparent); }
+.metric-top.mint { background: linear-gradient(90deg, var(--c-mint), transparent); }
+.metric-top.amber { background: linear-gradient(90deg, var(--c-amber), transparent); }
+.metric-top.coral { background: linear-gradient(90deg, var(--c-coral), transparent); }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.pill {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; font-size: 0.8rem;
+  padding: 9px 14px; border-radius: 999px; color: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+}
+.pill.sky { background: linear-gradient(135deg, var(--c-sky), var(--c-sky2)); }
+.pill.mint { background: linear-gradient(135deg, var(--c-mint), var(--c-mint2)); }
+.pill.amber { background: linear-gradient(135deg, var(--c-amber), var(--c-amber2)); }
+.pill.coral { background: linear-gradient(135deg, var(--c-coral), var(--c-coral2)); }
+.pill.indigo { background: linear-gradient(135deg, var(--c-indigo), var(--c-indigo2)); }
+.pill.orange { background: linear-gradient(135deg, var(--c-orange), var(--c-orange2)); }
+.pill.lime { background: linear-gradient(135deg, var(--c-lime), var(--c-lime2)); }
+.pill.cyan { background: linear-gradient(135deg, var(--c-cyan), var(--c-cyan2)); }
+.gap-banner {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 14px; margin-bottom: 14px;
+  border: 1px dashed color-mix(in srgb, var(--c-amber) 50%, var(--line));
+  background: color-mix(in srgb, var(--c-amber) 10%, var(--panel-solid));
+  font-size: 0.84rem;
+}
+.search { width: 100%; margin-bottom: 10px; }
+.path-chip {
+  font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+  padding: 6px 10px; border-radius: 8px; background: var(--panel-solid);
+  border: 1px solid var(--line); color: var(--muted); word-break: break-all;
+}
+.thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.thumb-grid button {
+  appearance: none; border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+  background: var(--panel-solid); cursor: pointer; text-align: left; font: inherit; color: var(--ink);
+}
+.thumb-grid button:hover { border-color: var(--c-sky); }
+.thumb-grid .t { font-size: 0.72rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb-grid .s { font-size: 0.65rem; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark">D</div>
+      <div>
+        <b>DUP</b>
+        <span data-i18n="brandSub">Ops Console · local</span>
+      </div>
+    </div>
+    <div class="chrome">
+      <button type="button" id="btnBack" title="Back" aria-label="Back">←</button>
+      <button type="button" id="btnForward" title="Forward" aria-label="Forward">→</button>
+      <button type="button" id="btnHome" title="Home" aria-label="Home">⌂</button>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-tab="overview" data-c="sky" class="active"><span class="ni">01</span><span data-i18n="navOverview">Overview</span></button>
+      <button data-tab="studio" data-c="indigo"><span class="ni">02</span><span data-i18n="navStudio">Studio</span></button>
+      <button data-tab="montage" data-c="orange"><span class="ni">03</span><span data-i18n="navMontage">Montage</span></button>
+      <button data-tab="library" data-c="cyan"><span class="ni">04</span><span data-i18n="navLibrary">Library</span></button>
+      <button data-tab="queue" data-c="amber"><span class="ni">05</span><span data-i18n="navQueue">Queue</span></button>
+      <button data-tab="publish" data-c="coral"><span class="ni">06</span><span data-i18n="navPublish">Publish</span></button>
+      <button data-tab="tools" data-c="lime"><span class="ni">07</span><span data-i18n="navTools">Tools</span></button>
+      <button data-tab="settings" data-c="mint"><span class="ni">08</span><span data-i18n="navSettings">System</span></button>
+    </nav>
+    <div class="side-foot">
+      <div class="seg" id="langSeg">
+        <button type="button" data-lang="ru" class="on">RU</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <div class="seg" id="themeSeg">
+        <button type="button" data-theme-btn="light" class="on" data-i18n="themeLight">Light</button>
+        <button type="button" data-theme-btn="dark" data-i18n="themeDark">Dark</button>
+      </div>
+      <div class="hint" data-i18n="sideHint">Idea → script → render → queue → ship. ALLOW ≠ views.</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumbs" id="crumbs"></div>
+      <div class="top-actions">
+        <span class="badge" id="ver">…</span>
+        <button class="btn ghost" id="btnRefresh" data-i18n="refresh">Refresh</button>
+      </div>
+    </div>
+    <div class="headline" style="margin-bottom:16px">
+      <h1 id="title">Overview</h1>
+      <p id="subtitle"></p>
+    </div>
+
+    <section class="panel active" id="tab-overview">
+
+      <div class="gap-banner gap-scan sky" style="border-style:solid">
+        <div>
+          <span data-i18n="overviewGap">Быстрый старт как у CapCut Drive: создать · смонтировать · отправить.</span>
+          <div class="chip-row" style="margin-top:8px">
+            <span class="chip have" data-i18n="chipHaveQuick">есть quick start</span>
+            <span class="chip have" data-i18n="chipHaveThumbs">есть recent thumbs</span>
+            <span class="chip miss" data-i18n="chipMissCalendar">нет Clipflow calendar</span>
+          </div>
+        </div>
+        <div class="pill-row" style="margin:0">
+          <button type="button" class="pill sky" data-jump="studio" data-i18n="qaStudio">Студия</button>
+          <button type="button" class="pill orange" data-jump="montage" data-i18n="qaMontage">Монтаж</button>
+          <button type="button" class="pill coral" data-jump="publish" data-i18n="qaPublish">Публикация</button>
+          <button type="button" class="pill mint" id="btnOpenExport" data-i18n="qaExport">Папка export</button>
+        </div>
+      </div>
+      <div class="card glow-sky" style="margin-bottom:14px">
+        <h3 data-i18n="recentRenders">Недавние рендеры</h3>
+        <div class="thumb-grid" id="recentThumbs"></div>
+      </div>
+      <div class="grid metrics" id="metrics"></div>
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3 data-i18n="recentJobs">Recent jobs</h3>
+          <div class="log" id="jobsLog">…</div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="preview">Preview</h3>
+          <div class="phone"><video id="preview" controls playsinline></video></div>
+          <p class="sub mono" id="previewMeta" style="margin-top:10px"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-studio">
+      <div class="gap-scan indigo">
+        <h4 data-i18n="gapStudioTitle">Студия · сверка CapCut / Descript</h4>
+        <p class="sub" data-i18n="gapStudioSub">Есть: script→TTS→captions+grade+motion+music. Нет (честно): transcript-cut как Descript, Seedance Gen, eye-contact.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveEmotion">есть emotion TTS</span>
+          <span class="chip have" data-i18n="chipHaveAspect">есть 9:16 / 1:1 / 16:9</span>
+          <span class="chip miss" data-i18n="chipMissTranscript">нет text-edit cut</span>
+          <span class="chip soon" data-i18n="chipSoonHook">скоро: hook/CTA packs</span>
+        </div>
+      </div>
+      <div class="workbench-tabs" id="wbTabs">
+        <button type="button" data-wb="compose" class="on" data-i18n="wbCompose">Compose</button>
+        <button type="button" data-wb="look" data-i18n="wbLook">Look</button>
+        <button type="button" data-wb="audio" data-i18n="wbAudio">Music & SFX</button>
+        <button type="button" data-wb="ideas" data-i18n="wbIdeas">Ideas</button>
+      </div>
+
+      <div class="wb on" id="wb-compose">
+        <div class="grid two">
+          <div class="card">
+            <h3 data-i18n="newClip">New clip</h3>
+            <div class="row" style="margin-bottom:12px">
+              <label class="field"><span data-i18n="topic">Topic</span>
+                <input id="topic" data-i18n-placeholder="topicPh" placeholder="fail-closed for agents"/>
+              </label>
+              <label class="field"><span data-i18n="language">Language</span>
+                <select id="lang"><option value="ru">ru</option><option value="en">en</option></select>
+              </label>
+            </div>
+            <div class="row" style="margin-bottom:12px">
+              <label class="check"><input type="checkbox" id="offlineTts"/> <span data-i18n="offlineTts">offline TTS (tone)</span></label>
+            </div>
+
+            <div class="pill-row">
+              <button type="button" class="pill indigo" id="btnAspect916">9:16</button>
+              <button type="button" class="pill cyan" id="btnAspect11">1:1</button>
+              <button type="button" class="pill amber" id="btnAspect169">16:9</button>
+              <button type="button" class="pill mint" id="btnCopyScript" data-i18n="copyScript">Copy script JSON</button>
+            </div>
+            <div class="row">
+              <button class="btn" id="btnScript" data-i18n="btnScript">Script</button>
+              <button class="btn" id="btnDemo" data-i18n="btnDemo">Demo render</button>
+              <button class="btn ghost" id="btnCartoon" data-i18n="btnCartoon">Cartoon emotions</button>
+            </div>
+            <p class="sub" style="margin-top:10px" data-i18n="studioHint">Script → JSON → pipeline. emotion / speaker for characters.</p>
+            <textarea id="scriptOut" readonly data-i18n-placeholder="scriptPh" placeholder="script.json"></textarea>
+            <div class="row" style="margin-top:10px">
+              <button class="btn" id="btnRunScript" disabled data-i18n="btnRunScript">Render script</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3 data-i18n="activePack">Active studio pack</h3>
+            <p class="sub" data-i18n="packHint">Template + look + music apply on every render.</p>
+            <div class="log" id="prefsLog" style="margin-top:10px;max-height:180px"></div>
+            <div class="log" id="studioLog" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wb" id="wb-look">
+        <div class="card">
+          <h3 data-i18n="templates">Templates</h3>
+          <p class="sub" data-i18n="tplHint">One pack = captions + grade + motion + music (CapCut-class).</p>
+          <div class="choice-grid" id="tplGrid" style="margin-top:12px"></div>
+        </div>
+        <div class="grid two" style="margin-top:14px">
+          <div class="card">
+            <h3 data-i18n="colorGrade">Color grade</h3>
+            <div class="choice-grid" id="gradeGrid" style="margin-top:10px"></div>
+          </div>
+          <div class="card">
+            <h3 data-i18n="motion">Motion</h3>
+            <div class="choice-grid" id="motionGrid" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wb" id="wb-audio">
+        <div class="grid two">
+          <div class="card">
+            <h3 data-i18n="musicMood">Music mood</h3>
+            <p class="sub" data-i18n="musicHint">Procedural beds (or assets/music). Not a stock-license claim.</p>
+            <div class="choice-grid" id="moodGrid" style="margin-top:10px"></div>
+          </div>
+          <div class="card">
+            <h3 data-i18n="sfxTitle">Scene SFX</h3>
+            <p class="sub" data-i18n="sfxHint">Soft whoosh on joins — CapCut/Descript transition feel.</p>
+            <label class="check" style="margin-top:14px"><input type="checkbox" id="sfxToggle"/> <span data-i18n="sfxEnable">Enable transition whoosh</span></label>
+            <div class="row" style="margin-top:16px">
+              <button class="btn" id="btnSaveStudio" data-i18n="saveStudio">Save studio pack</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wb" id="wb-ideas">
+        <div class="card">
+          <h3 data-i18n="ideasTitle">Ideas (not virality)</h3>
+          <div class="row">
+            <button class="btn ghost" id="btnIdeas" data-i18n="btnIdeas">Suggest topics</button>
+          </div>
+          <ul class="list" id="ideasList" style="margin-top:12px"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-montage">
+      <div class="gap-scan orange">
+        <h4 data-i18n="gapMontageTitle">Монтаж · сверка CapCut Desktop</h4>
+        <p class="sub" data-i18n="gapMontageSub">Есть: import/URL/trim/dup/stitch/save/export/send. Нет: multi-track keyframes, auto-reframe AI, transitions library.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveShip">есть Save·Export·Send</span>
+          <span class="chip have" data-i18n="chipHaveUndo">есть Undo/Redo</span>
+          <span class="chip miss" data-i18n="chipMissKeyframe">нет keyframes</span>
+          <span class="chip miss" data-i18n="chipMissTrans">нет transitions pack</span>
+        </div>
+      </div>
+      <div class="ship-bar">
+        <div>
+          <div style="font-weight:700;margin-bottom:4px" data-i18n="shipTitle">Сохранить · Экспорт · Отправить</div>
+          <div class="hint-line" data-i18n="shipHint">Как CapCut/OpenReel: проект → файл MP4 → папка/TikTok. ALLOW ≠ просмотры.</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="btnUndo" title="Ctrl+Z">↶ <span data-i18n="undo">Undo</span></button>
+          <button class="btn ghost" id="btnRedo" title="Ctrl+Y">↷ <span data-i18n="redo">Redo</span></button>
+          <button class="btn primary" id="btnSaveTl" title="Ctrl+S">💾 <span data-i18n="saveTl">Сохранить</span></button>
+          <button class="btn primary" id="btnExportMontage">📦 <span data-i18n="btnExportMp4">Экспорт</span></button>
+          <button class="btn primary send" id="btnSendMontage">🚀 <span data-i18n="btnSend">Отправить</span></button>
+          <span class="badge" id="dirtyBadge" style="display:none">● unsaved</span>
+          <label class="check"><input type="checkbox" id="onlineNet" checked/> <span data-i18n="onlineMode">Online</span></label>
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:12px;gap:8px">
+        <button class="btn ghost" id="btnLoadProject" data-i18n="loadProject">Открыть проект</button>
+        <select id="sendMode" style="min-width:160px">
+          <option value="export" data-i18n-option="sendFolder">В папку export</option>
+          <option value="tiktok" data-i18n-option="sendTiktok">TikTok inbox (API)</option>
+        </select>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <h3 style="margin:0" data-i18n="mediaLib">Media library</h3>
+            <button class="btn ghost" id="btnDeselect" data-i18n="deselect">Deselect</button>
+          </div>
+          <div class="drop" id="mediaDrop"><span data-i18n="dropMedia">Drop video/image here or click</span>
+            <input type="file" id="mediaFile" accept="video/*,image/*" hidden multiple/>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label class="field" style="flex:1"><span data-i18n="importUrl">Import URL</span>
+              <input id="mediaUrl" placeholder="https://…"/>
+            </label>
+            <button class="btn ghost" id="btnImportUrl" data-i18n="btnImport">Import</button>
+          </div>
+          <ul class="list" id="mediaList" style="margin-top:12px;max-height:300px;overflow:auto"></ul>
+          <p class="sub mono" id="selMeta" style="margin-top:8px"></p>
+        </div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <h3 style="margin:0" data-i18n="timelineTitle">Timeline</h3>
+            <div class="row">
+              <button class="btn ghost" id="btnClearTl" data-i18n="clearTl">Clear</button>
+            </div>
+          </div>
+          <p class="sub" data-i18n="timelineHint">Add → reorder → trim → save → stitch. Delete / Undo like CapCut.</p>
+          <ul class="list" id="timelineList"></ul>
+          <div class="row" style="margin-top:10px">
+            <label class="field"><span data-i18n="trimStart">Start (s)</span><input id="trimStart" type="number" min="0" step="0.1" value="0" style="min-width:90px"/></label>
+            <label class="field"><span data-i18n="trimDur">Duration (s)</span><input id="trimDur" type="number" min="0.2" step="0.1" value="" placeholder="full" style="min-width:90px"/></label>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ghost" id="btnTrim" data-i18n="btnTrim">Trim</button>
+            <button class="btn ghost" id="btnImgClip" data-i18n="btnImgClip">Image → clip</button>
+            <button class="btn ghost" id="btnDup" data-i18n="btnDup">Duplicate</button>
+            <button class="btn" id="btnRenderTl" data-i18n="btnRenderTl">Stitch</button>
+          </div>
+          <div class="phone" style="margin-top:14px"><video id="montagePreview" controls playsinline></video></div>
+          <div class="log" id="montageLog" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-library">
+      <div class="gap-scan cyan">
+        <h4 data-i18n="gapLibTitle">Библиотека · сверка Opus collections</h4>
+        <p class="sub" data-i18n="gapLibSub">Есть: renders search, assets upload, open folders. Нет: client collections, object/dialogue smart search.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveSearch">есть поиск</span>
+          <span class="chip have" data-i18n="chipHaveUpload">есть upload</span>
+          <span class="chip miss" data-i18n="chipMissCollections">нет collections</span>
+          <span class="chip soon" data-i18n="chipSoonThumbs">скоро: thumbnails grid</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <h3 style="margin:0" data-i18n="rendersAssets">Renders & assets</h3>
+          <button class="btn ghost" id="btnLibRefresh" data-i18n="refresh">Refresh</button>
+        </div>
+        <input class="search" id="libSearch" data-i18n-placeholder="searchPh" placeholder="Search renders…"/>
+        <ul class="list" id="libList"></ul>
+        <div class="row" style="margin-top:10px"><button class="btn ghost" id="btnOpenOut" data-i18n="openOut">Open out/</button><button class="btn ghost" id="btnOpenAssets" data-i18n="openAssets">Open assets/</button></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3 data-i18n="uploadAssets">Upload to assets/</h3>
+        <div class="drop" id="assetDrop"><span data-i18n="dropAssets">Drop image/video/music here or click</span>
+          <input type="file" id="assetFile" hidden/>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="field"><span data-i18n="kind">Kind</span>
+            <select id="assetKind"><option value="media">media</option><option value="music">music</option></select>
+          </label>
+        </div>
+        <div class="log" id="libLog" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-queue">
+      <div class="gap-scan amber">
+        <h4 data-i18n="gapQueueTitle">Очередь · сверка Habr / Thrice / content-factory</h4>
+        <p class="sub" data-i18n="gapQueueSub">Есть: drop-folder inbox, dry-run, cartoon fixture. Нет: Telegram remote approve, n8n webhook, virality score (не выдумываем).</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveInbox">есть inbox</span>
+          <span class="chip have" data-i18n="chipHaveDry">есть dry-run</span>
+          <span class="chip miss" data-i18n="chipMissTg">нет Telegram approve</span>
+          <span class="chip miss" data-i18n="chipMissVirality">нет fake virality</span>
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3 data-i18n="inboxQueue">Inbox queue</h3>
+          <p class="sub" data-i18n="inboxHint">Drop script.json — like Opus/MKVID drop-folder.</p>
+          <div class="drop" id="inboxDrop" data-i18n="dropInbox">Drop script.json here</div>
+          <textarea id="inboxPaste" placeholder='{"title":"...","scenes":[...]}' style="margin-top:12px"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="btnInboxSave" data-i18n="toQueue">To queue</button>
+            <button class="btn ghost" id="btnInboxRun" data-i18n="process">Process</button>
+            <button class="btn ghost" id="btnInboxFixture" data-i18n="addCartoon">+ cartoon fixture</button>
+            <button class="btn ghost" id="btnInboxDry" data-i18n="dryRun">Dry-run</button>
+            <button class="btn ghost" id="btnOpenInbox2" data-i18n="openInbox">Open inbox</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="inboxState">Inbox state</h3>
+          <div id="inboxStats"></div>
+          <ul class="list" id="inboxPending" style="margin-top:10px"></ul>
+          <div class="log" id="queueLog" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-publish">
+      <div class="gap-scan coral">
+        <h4 data-i18n="gapPubTitle">Публикация · сверка CapCut share / Clipflow</h4>
+        <p class="sub" data-i18n="gapPubSub">Есть: ready · finish · export folder · TikTok official API. Нет: auto-schedule 6 platforms, analytics invent — только ingest реальных CSV.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveReady">есть ready/finish</span>
+          <span class="chip have" data-i18n="chipHaveTiktok">есть TikTok API path</span>
+          <span class="chip miss" data-i18n="chipMissSched">нет multi-schedule</span>
+          <span class="chip soon" data-i18n="chipSoonYt">скоро: YT/IG keys UI</span>
+        </div>
+      </div>
+
+      <div class="ship-bar" style="margin-bottom:14px">
+        <div>
+          <div style="font-weight:700;margin-bottom:4px" data-i18n="pubShipTitle">Проверить · Finish · Экспорт · TikTok</div>
+          <div class="hint-line" data-i18n="pubShipHint">Opus/CapCut send path: ready → pack → folder or official API.</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnReady2" data-i18n="btnReady">Check</button>
+          <button class="btn primary" id="btnFinish2" data-i18n="btnFinish">Finish</button>
+          <button class="btn primary" id="btnExport2" data-i18n="btnExport">Export</button>
+          <button class="btn primary send" id="btnTiktokSend" data-i18n="btnTiktok">Send TikTok</button>
+        </div>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3 data-i18n="readyTitle">Ready checklist</h3>
+          <p class="sub" data-i18n="readyHint">Fail-closed: local ALLOW artifacts only.</p>
+          <div id="readyChecks"></div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" id="btnReady" data-i18n="btnReady">Check</button>
+            <button class="btn ghost" id="btnFinish" data-i18n="btnFinish">Finish (copy+bundle)</button>
+            <button class="btn ghost" id="btnExport" data-i18n="btnExport">Export folder</button>
+          </div>
+          <div class="log" id="pubLog" style="margin-top:12px"></div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="keysTitle">Keys (presence only)</h3>
+          <div id="keysBox"></div>
+          <p class="sub" style="margin-top:12px" data-i18n="keysHint">TikTok / YT / IG — official API only. Cookie bots refused.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-tools">
+      <div class="gap-scan lime">
+        <h4 data-i18n="gapToolsTitle">Инструменты · сверка suite drawers</h4>
+        <p class="sub" data-i18n="gapToolsSub">Create / Polish / Ship — без мусорного ящика. Score/styles локальные; не Runway Gen.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveGroups">есть группы</span>
+          <span class="chip have" data-i18n="chipHaveLocal">есть local polish</span>
+          <span class="chip miss" data-i18n="chipMissGen">нет Gen-video claim</span>
+        </div>
+      </div>
+      <p class="sub" style="margin:0 0 8px" data-i18n="toolsIntro">Grouped like a real suite — create, polish, ship. No junk drawer.</p>
+      <div id="toolsGrid"></div>
+      <div class="log" id="toolsLog" style="margin-top:14px"></div>
+    </section>
+
+    <section class="panel" id="tab-settings">
+      <div class="gap-scan mint">
+        <h4 data-i18n="gapSysTitle">Система · сверка ops desks</h4>
+        <p class="sub" data-i18n="gapSysSub">Есть: doctor, open folders, online toggle. Нет: remote VPS agent, cloud sync Space.</p>
+        <div class="chip-row">
+          <span class="chip have" data-i18n="chipHaveDoctor">есть doctor</span>
+          <span class="chip have" data-i18n="chipHaveOpen">есть open folders</span>
+          <span class="chip miss" data-i18n="chipMissCloud">нет CapCut Space sync</span>
+        </div>
+      </div>
+      <div class="card glow-mint">
+        <h3 data-i18n="doctorTitle">Doctor / paths</h3>
+        <div class="log" id="doctorLog"></div>
+      </div>
+
+      <div class="card glow-mint" style="margin-top:14px">
+        <h3 data-i18n="pathsTitle">Paths / open folders</h3>
+        <div class="pill-row">
+          <button type="button" class="pill mint" id="btnOpenRoot" data-i18n="openRoot">Package</button>
+          <button type="button" class="pill cyan" id="btnOpenInbox" data-i18n="openInbox">Inbox</button>
+          <button type="button" class="pill amber" id="btnOpenMontage" data-i18n="openMontage">Montage</button>
+          <button type="button" class="pill coral" id="btnOpenExport2" data-i18n="qaExport">Export</button>
+        </div>
+        <p class="path-chip" id="pathChip">…</p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn ghost" id="btnDoctorRefresh" data-i18n="refreshDoctor">Refresh doctor</button>
+          <button class="btn ghost" id="btnCopyDoctor" data-i18n="copyDoctor">Copy doctor JSON</button>
+        </div>
+      </div>
+      <div class="card glow-amber" style="margin-top:14px">
+        <h3 data-i18n="netTitle">Network policy</h3>
+        <p class="sub" data-i18n="netHint">Online = URL import / edge-tts / stock. Offline = local only.</p>
+        <label class="check"><input type="checkbox" id="globalOnline" checked/> <span data-i18n="onlineMode">Online</span></label>
+      </div>
+
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const I18N = {
+  ru: {
+    brandSub: "Ops Console · локально",
+    sideHint: "Идея → скрипт → рендер → очередь → ship. ALLOW ≠ просмотры.",
+    navOverview: "Обзор", navStudio: "Студия", navMontage: "Монтаж", navLibrary: "Библиотека",
+    navQueue: "Очередь", navPublish: "Публикация", navTools: "Инструменты", navSettings: "Система",
+    mediaLib: "Медиатека", onlineMode: "Онлайн (URL / сеть)", dropMedia: "Видео/картинка сюда или клик",
+    importUrl: "Импорт URL", btnImport: "Скачать", timelineTitle: "Таймлайн",
+    timelineHint: "Добавить → порядок → обрезка → сохранить → склеить. Delete / Undo как в CapCut.",
+    trimStart: "Старт (с)", trimDur: "Длина (с)", btnTrim: "Обрезать",
+    btnImgClip: "Картинка → клип", btnRenderTl: "Склеить",
+    addTl: "В таймлайн", emptyMedia: "пусто — загрузите файлы", emptyTl: "таймлайн пуст",
+    undo: "Отмена", redo: "Вперёд", saveTl: "Сохранить", clearTl: "Очистить",
+    deselect: "Снять выбор", btnDup: "Дублировать", btnDel: "Удалить",
+    moveUp: "↑", moveDown: "↓", confirmDel: "Удалить файл из библиотеки?",
+    confirmClear: "Очистить весь таймлайн?", savedOk: "Проект сохранён",
+    shipTitle: "Сохранить · Экспорт · Отправить",
+    shipHint: "Как CapCut/OpenReel: проект → MP4 → папка/TikTok. ALLOW ≠ просмотры.",
+    btnExportMp4: "Экспорт", btnSend: "Отправить", loadProject: "Открыть проект",
+    sendFolder: "В папку export", sendTiktok: "TikTok inbox (API)",
+    exportedOk: "Экспортировано в out/export",
+    sentOk: "Готово к отправке / отправлено",
+
+    overviewGap: "Быстрый старт как у CapCut Drive: создать · смонтировать · отправить.",
+    qaStudio: "Студия", qaMontage: "Монтаж", qaPublish: "Публикация", qaExport: "Папка export",
+    recentRenders: "Недавние рендеры", searchPh: "Поиск рендеров…",
+    openOut: "Открыть out/", openAssets: "Открыть assets/",
+    pubShipTitle: "Проверить · Finish · Экспорт · TikTok",
+    pubShipHint: "Путь Opus/CapCut: ready → pack → папка или official API.",
+    btnTiktok: "В TikTok", pathsTitle: "Пути / папки",
+    openRoot: "Корень пакета", openInbox: "Inbox", openMontage: "Montage",
+    refreshDoctor: "Обновить doctor", copyDoctor: "Копировать doctor",
+    netTitle: "Сеть", netHint: "Online = URL / edge-tts / stock. Offline = только локально.",
+    dryRun: "Dry-run", copyScript: "Копировать script JSON",
+
+    gapStudioTitle: "Студия · сверка CapCut / Descript",
+    gapStudioSub: "Есть: script→TTS→captions+grade+motion+music. Нет: transcript-cut, Seedance Gen, eye-contact.",
+    chipHaveEmotion: "есть emotion TTS", chipHaveAspect: "есть 9:16 / 1:1 / 16:9",
+    chipMissTranscript: "нет text-edit cut", chipSoonHook: "скоро: hook/CTA packs",
+    gapMontageTitle: "Монтаж · сверка CapCut Desktop",
+    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send. Нет: keyframes, auto-reframe, transitions pack.",
+    chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
+    chipMissKeyframe: "нет keyframes", chipMissTrans: "нет transitions pack",
+    gapLibTitle: "Библиотека · сверка Opus collections",
+    gapLibSub: "Есть: поиск, upload, папки. Нет: client collections, smart object search.",
+    chipHaveSearch: "есть поиск", chipHaveUpload: "есть upload",
+    chipMissCollections: "нет collections", chipSoonThumbs: "скоро: thumbnails grid",
+    gapQueueTitle: "Очередь · сверка Habr / Thrice / content-factory",
+    gapQueueSub: "Есть: inbox, dry-run, fixture. Нет: Telegram approve, n8n webhook, fake virality.",
+    chipHaveInbox: "есть inbox", chipHaveDry: "есть dry-run",
+    chipMissTg: "нет Telegram approve", chipMissVirality: "нет fake virality",
+    gapPubTitle: "Публикация · сверка CapCut share / Clipflow",
+    gapPubSub: "Есть: ready·finish·export·TikTok API. Нет: multi-schedule; аналитика только из реальных CSV.",
+    chipHaveReady: "есть ready/finish", chipHaveTiktok: "есть TikTok API path",
+    chipMissSched: "нет multi-schedule", chipSoonYt: "скоро: YT/IG keys UI",
+    gapToolsTitle: "Инструменты · сверка suite drawers",
+    gapToolsSub: "Create / Polish / Ship. Score локальный — не Runway Gen.",
+    chipHaveGroups: "есть группы", chipHaveLocal: "есть local polish", chipMissGen: "нет Gen-video claim",
+    gapSysTitle: "Система · сверка ops desks",
+    gapSysSub: "Есть: doctor, open folders, online. Нет: VPS agent, CapCut Space sync.",
+    chipHaveDoctor: "есть doctor", chipHaveOpen: "есть open folders", chipMissCloud: "нет CapCut Space sync",
+    chipHaveQuick: "есть quick start", chipHaveThumbs: "есть recent thumbs", chipMissCalendar: "нет Clipflow calendar",
+    themeLight: "Светлый", themeDark: "Тёмный", refresh: "Обновить",
+    recentJobs: "Последние задания", preview: "Превью",
+    wbCompose: "Сборка", wbLook: "Образ", wbAudio: "Музыка & SFX", wbIdeas: "Идеи",
+    activePack: "Активный studio pack", packHint: "Шаблон + образ + музыка на каждый рендер.",
+    templates: "Шаблоны", tplHint: "Один pack = титры + цвет + motion + музыка.",
+    colorGrade: "Цветокор", motion: "Motion", musicMood: "Настроение музыки",
+    musicHint: "Процедурные bed’ы (или assets/music). Не лицензия стока.",
+    sfxTitle: "SFX сцен", sfxHint: "Мягкий whoosh на стыках — как CapCut/Descript.",
+    sfxEnable: "Включить whoosh на переходах", saveStudio: "Сохранить studio pack",
+    toolsIntro: "Как у профи-сьюта: create → polish → ship. Без свалки.",
+    catCreate: "Create", catPolish: "Polish", catShip: "Ship",
+    newClip: "Новый ролик", topic: "Тема", topicPh: "например: fail-closed для агентов",
+    language: "Язык", offlineTts: "offline TTS (тон)",
+    btnScript: "Скрипт", btnDemo: "Demo рендер", btnCartoon: "Мульт-эмоции",
+    studioHint: "Скрипт → JSON → pipeline. emotion / speaker — для персонажей.",
+    scriptPh: "script.json появится здесь", btnRunScript: "Рендер скрипта",
+    ideasTitle: "Идеи (не виральность)", btnIdeas: "Предложить темы", useTopic: "В тему",
+    rendersAssets: "Рендеры и ассеты", uploadAssets: "Загрузка в assets/",
+    dropAssets: "Перетащите файл сюда или кликните", kind: "Тип",
+    inboxQueue: "Inbox очередь", inboxHint: "Киньте script.json — как drop-folder у Opus/MKVID.",
+    dropInbox: "Drop script.json сюда", toQueue: "В очередь", process: "Обработать",
+    addCartoon: "+ cartoon fixture", inboxState: "Состояние inbox",
+    readyTitle: "Ready checklist", readyHint: "Fail-closed: только локальные ALLOW артефакты.",
+    btnReady: "Проверить", btnFinish: "Finish (copy+bundle)", btnExport: "Export folder",
+    keysTitle: "Ключи (только наличие)", keysHint: "TikTok / YT / IG — official API. Cookie-боты запрещены.",
+    doctorTitle: "Doctor / пути", emptyJobs: "пусто — ещё нет заданий", emptyLib: "Нет mp4 в out/",
+    emptyInbox: "пусто", pending: "ожидают", allowTail: "ALLOW (хвост)", refuseTail: "REFUSE (хвост)",
+    inbox: "Inbox", renders: "Рендеры", inOut: "в out/",
+    titles: {
+      overview: ["Обзор", "Статусы, джобы, превью — control room"],
+      studio: ["Студия", "Workbench: сборка · образ · музыка · идеи"],
+      montage: ["Монтаж", "Загрузка · обрезка · склейка · URL"],
+      library: ["Библиотека", "MP4, фикстуры, загрузки в assets"],
+      queue: ["Очередь", "Inbox drop → process → done/refuse"],
+      publish: ["Публикация", "Ready → finish/export (без автопоста)"],
+      tools: ["Инструменты", "Полный набор действий пайплайна"],
+      settings: ["Система", "Doctor, ffmpeg, пути, ключи"]
+    },
+    tools: {
+      demo: ["Demo", "fixture → mp4"],
+      cartoon: ["Мульт", "emotion fixture"],
+      ideas: ["Ideas", "темы ≠ virality"],
+      inbox: ["Inbox", "process queue"],
+      montage: ["Монтаж", "upload · trim · stitch"],
+      ready: ["Ready", "checklist"],
+      finish: ["Finish", "copy + bundle"],
+      export: ["Export", "папка для ручной загрузки"],
+      score: ["Hook score", "эвристика, не виральность"],
+      styles: ["Styles", "clean / boxed / bold"],
+      chapters: ["Chapters", "YouTube paste marks"],
+      normalize: ["Loudnorm", "выровнять громкость"],
+      icon: ["Icon", "бренд 1024 PNG"],
+      status: ["Status", "audit / jobs digest"],
+      jobs: ["Jobs", "хвост jobs.jsonl"],
+      doctor: ["Doctor", "пути / ffmpeg"],
+      refresh: ["Refresh", "обновить снимок"]
+    }
+  },
+  en: {
+    brandSub: "Ops Console · local",
+    sideHint: "Idea → script → render → queue → ship. ALLOW ≠ views.",
+    navOverview: "Overview", navStudio: "Studio", navMontage: "Montage", navLibrary: "Library",
+    navQueue: "Queue", navPublish: "Publish", navTools: "Tools", navSettings: "System",
+    mediaLib: "Media library", onlineMode: "Online (URL / network)", dropMedia: "Drop video/image or click",
+    importUrl: "Import URL", btnImport: "Fetch", timelineTitle: "Timeline",
+    timelineHint: "Add → reorder → trim → save → stitch. Delete / Undo like CapCut.",
+    trimStart: "Start (s)", trimDur: "Duration (s)", btnTrim: "Trim",
+    btnImgClip: "Image → clip", btnRenderTl: "Stitch",
+    addTl: "Add to timeline", emptyMedia: "empty — upload files", emptyTl: "timeline empty",
+    undo: "Undo", redo: "Redo", saveTl: "Save", clearTl: "Clear",
+    deselect: "Deselect", btnDup: "Duplicate", btnDel: "Delete",
+    moveUp: "↑", moveDown: "↓", confirmDel: "Delete file from library?",
+    confirmClear: "Clear entire timeline?", savedOk: "Project saved",
+    shipTitle: "Save · Export · Send",
+    shipHint: "Like CapCut/OpenReel: project → MP4 → folder/TikTok. ALLOW ≠ views.",
+    btnExportMp4: "Export", btnSend: "Send", loadProject: "Open project",
+    sendFolder: "To export folder", sendTiktok: "TikTok inbox (API)",
+    exportedOk: "Exported to out/export",
+    sentOk: "Ready / sent",
+
+    overviewGap: "CapCut Drive-style quick start: create · edit · send.",
+    qaStudio: "Studio", qaMontage: "Montage", qaPublish: "Publish", qaExport: "Export folder",
+    recentRenders: "Recent renders", searchPh: "Search renders…",
+    openOut: "Open out/", openAssets: "Open assets/",
+    pubShipTitle: "Ready · Finish · Export · TikTok",
+    pubShipHint: "Opus/CapCut path: ready → pack → folder or official API.",
+    btnTiktok: "To TikTok", pathsTitle: "Paths / folders",
+    openRoot: "Package root", openInbox: "Inbox", openMontage: "Montage",
+    refreshDoctor: "Refresh doctor", copyDoctor: "Copy doctor",
+    netTitle: "Network", netHint: "Online = URL / edge-tts / stock. Offline = local only.",
+    dryRun: "Dry-run", copyScript: "Copy script JSON",
+
+    gapStudioTitle: "Studio · CapCut / Descript scan",
+    gapStudioSub: "Have: script→TTS→captions+grade+motion+music. Missing: transcript-cut, Seedance Gen, eye-contact.",
+    chipHaveEmotion: "have emotion TTS", chipHaveAspect: "have 9:16 / 1:1 / 16:9",
+    chipMissTranscript: "no text-edit cut", chipSoonHook: "soon: hook/CTA packs",
+    gapMontageTitle: "Montage · CapCut Desktop scan",
+    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send. Missing: keyframes, auto-reframe, transitions pack.",
+    chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
+    chipMissKeyframe: "no keyframes", chipMissTrans: "no transitions pack",
+    gapLibTitle: "Library · Opus collections scan",
+    gapLibSub: "Have: search, upload, folders. Missing: client collections, smart object search.",
+    chipHaveSearch: "have search", chipHaveUpload: "have upload",
+    chipMissCollections: "no collections", chipSoonThumbs: "soon: thumbnails grid",
+    gapQueueTitle: "Queue · Habr / Thrice / content-factory scan",
+    gapQueueSub: "Have: inbox, dry-run, fixture. Missing: Telegram approve, n8n webhook, fake virality.",
+    chipHaveInbox: "have inbox", chipHaveDry: "have dry-run",
+    chipMissTg: "no Telegram approve", chipMissVirality: "no fake virality",
+    gapPubTitle: "Publish · CapCut share / Clipflow scan",
+    gapPubSub: "Have: ready·finish·export·TikTok API. Missing: multi-schedule; analytics only from real CSV.",
+    chipHaveReady: "have ready/finish", chipHaveTiktok: "have TikTok API path",
+    chipMissSched: "no multi-schedule", chipSoonYt: "soon: YT/IG keys UI",
+    gapToolsTitle: "Tools · suite drawers scan",
+    gapToolsSub: "Create / Polish / Ship. Local score — not Runway Gen.",
+    chipHaveGroups: "have groups", chipHaveLocal: "have local polish", chipMissGen: "no Gen-video claim",
+    gapSysTitle: "System · ops desks scan",
+    gapSysSub: "Have: doctor, open folders, online. Missing: VPS agent, CapCut Space sync.",
+    chipHaveDoctor: "have doctor", chipHaveOpen: "have open folders", chipMissCloud: "no CapCut Space sync",
+    chipHaveQuick: "have quick start", chipHaveThumbs: "have recent thumbs", chipMissCalendar: "no Clipflow calendar",
+    themeLight: "Light", themeDark: "Dark", refresh: "Refresh",
+    recentJobs: "Recent jobs", preview: "Preview",
+    wbCompose: "Compose", wbLook: "Look", wbAudio: "Music & SFX", wbIdeas: "Ideas",
+    activePack: "Active studio pack", packHint: "Template + look + music apply on every render.",
+    templates: "Templates", tplHint: "One pack = captions + grade + motion + music.",
+    colorGrade: "Color grade", motion: "Motion", musicMood: "Music mood",
+    musicHint: "Procedural beds (or assets/music). Not a stock-license claim.",
+    sfxTitle: "Scene SFX", sfxHint: "Soft whoosh on joins — CapCut/Descript feel.",
+    sfxEnable: "Enable transition whoosh", saveStudio: "Save studio pack",
+    toolsIntro: "Grouped like a real suite — create, polish, ship. No junk drawer.",
+    catCreate: "Create", catPolish: "Polish", catShip: "Ship",
+    newClip: "New clip", topic: "Topic", topicPh: "e.g. fail-closed for agents",
+    language: "Language", offlineTts: "offline TTS (tone)",
+    btnScript: "Script", btnDemo: "Demo render", btnCartoon: "Cartoon emotions",
+    studioHint: "Script → JSON → pipeline. Use emotion / speaker for characters.",
+    scriptPh: "script.json will appear here", btnRunScript: "Render script",
+    ideasTitle: "Ideas (not virality)", btnIdeas: "Suggest topics", useTopic: "Use topic",
+    rendersAssets: "Renders & assets", uploadAssets: "Upload to assets/",
+    dropAssets: "Drop media here or click", kind: "Kind",
+    inboxQueue: "Inbox queue", inboxHint: "Drop script.json — Opus/MKVID-style folder.",
+    dropInbox: "Drop script.json here", toQueue: "Enqueue", process: "Process",
+    addCartoon: "+ cartoon fixture", inboxState: "Inbox state",
+    readyTitle: "Ready checklist", readyHint: "Fail-closed: local ALLOW artifacts only.",
+    btnReady: "Check", btnFinish: "Finish (copy+bundle)", btnExport: "Export folder",
+    keysTitle: "Keys (presence only)", keysHint: "TikTok / YT / IG — official API only. Cookie bots refused.",
+    doctorTitle: "Doctor / paths", emptyJobs: "empty — no jobs yet", emptyLib: "No mp4 under out/",
+    emptyInbox: "empty", pending: "pending", allowTail: "ALLOW (tail)", refuseTail: "REFUSE (tail)",
+    inbox: "Inbox", renders: "Renders", inOut: "under out/",
+    titles: {
+      overview: ["Overview", "Status, jobs, preview — control room"],
+      studio: ["Studio", "Workbench: compose · look · music · ideas"],
+      montage: ["Montage", "Upload · trim · stitch · URL import"],
+      library: ["Library", "MP4s, fixtures, asset uploads"],
+      queue: ["Queue", "Inbox drop → process → done/refuse"],
+      publish: ["Publish", "Ready → finish/export (no auto-post)"],
+      tools: ["Tools", "Full pipeline action pad"],
+      settings: ["System", "Doctor, ffmpeg, paths, keys"]
+    },
+    tools: {
+      demo: ["Demo", "fixture → mp4"],
+      cartoon: ["Cartoon", "emotion fixture"],
+      ideas: ["Ideas", "topics ≠ virality"],
+      inbox: ["Inbox", "process queue"],
+      montage: ["Montage", "upload · trim · stitch"],
+      ready: ["Ready", "checklist"],
+      finish: ["Finish", "copy + bundle"],
+      export: ["Export", "manual upload folder"],
+      score: ["Hook score", "heuristic, not virality"],
+      styles: ["Styles", "clean / boxed / bold"],
+      chapters: ["Chapters", "YouTube paste marks"],
+      normalize: ["Loudnorm", "level the loudness"],
+      icon: ["Icon", "brand 1024 PNG"],
+      status: ["Status", "audit / jobs digest"],
+      jobs: ["Jobs", "jobs.jsonl tail"],
+      doctor: ["Doctor", "paths / ffmpeg"],
+      refresh: ["Refresh", "reload snapshot"]
+    }
+  }
+};
+
+const TAB_ORDER = ["overview","studio","montage","library","queue","publish","tools","settings"];
+let LANG = localStorage.getItem("dup_ops_lang") || "ru";
+let THEME = localStorage.getItem("dup_ops_theme") || "light";
+let SNAP = null;
+let LAST_SCRIPT = null;
+let STUDIO = null;
+let PREFS = {};
+let MEDIA = [];
+let TIMELINE = [];
+let SELECTED = null;
+let TL_INDEX = null;
+let DIRTY = false;
+let undoStack = [];
+let redoStack = [];
+let hist = ["overview"];
+let histIdx = 0;
+let navigating = false;
+
+const $ = (id) => document.getElementById(id);
+const t = (key) => (I18N[LANG] && I18N[LANG][key]) || (I18N.en[key] || key);
+const log = (el, msg) => { el.textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2); };
+const toast = (msg) => {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2600);
+};
+
+function applyI18n() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    const val = t(key);
+    if (typeof val === "string") el.textContent = val;
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+  });
+  document.querySelectorAll("[data-i18n-option]").forEach(el => {
+    const val = t(el.getAttribute("data-i18n-option"));
+    if (typeof val === "string") el.textContent = val;
+  });
+  document.querySelectorAll("#langSeg button").forEach(b => b.classList.toggle("on", b.dataset.lang === LANG));
+  document.querySelectorAll("#themeSeg button").forEach(b => b.classList.toggle("on", b.dataset.themeBtn === THEME));
+  applyTabLabels();
+  renderTools();
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", THEME);
+  localStorage.setItem("dup_ops_theme", THEME);
+}
+
+function applyTabLabels() {
+  const titles = I18N[LANG].titles;
+  const cur = hist[histIdx] || "overview";
+  const pair = titles[cur] || [cur, ""];
+  $("title").textContent = pair[0];
+  $("subtitle").textContent = pair[1];
+  $("crumbs").innerHTML = `
+    <span class="crumb">DUP</span>
+    <span class="mono" style="color:var(--muted)">/</span>
+    <span class="crumb now">${pair[0]}</span>
+    <span class="mono" style="color:var(--muted)">${histIdx + 1}/${hist.length}</span>`;
+}
+
+function updateChrome() {
+  $("btnBack").disabled = histIdx <= 0;
+  $("btnForward").disabled = histIdx >= hist.length - 1;
+}
+
+function setTab(name, {push = true} = {}) {
+  if (!TAB_ORDER.includes(name)) return;
+  document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + name));
+  if (push && !navigating) {
+    if (hist[histIdx] !== name) {
+      hist = hist.slice(0, histIdx + 1);
+      hist.push(name);
+      histIdx = hist.length - 1;
+    }
+  }
+  applyTabLabels();
+  updateChrome();
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!r.ok && j.ok === false) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function mediaUrl(rel) { return "/api/media?path=" + encodeURIComponent(rel); }
+function setPreview(rel, meta) {
+  if (!rel) return;
+  $("preview").src = mediaUrl(rel);
+  $("previewMeta").textContent = meta || rel;
+}
+
+function renderMetrics(s) {
+  const a = s.status?.audit || {};
+  const ib = s.inbox?.counts || {};
+  const cards = [
+    [t("allowTail"), a.allow_events ?? "—", "audit.jsonl"],
+    [t("refuseTail"), a.refuse_events ?? "—", "fail-closed"],
+    [t("inbox"), ib.pending ?? 0, t("pending")],
+    [t("renders"), (s.library?.renders || []).length, t("inOut")]
+  ];
+  $("metrics").innerHTML = cards.map(([k,v,sub]) =>
+    `<div class="card"><div class="sub">${k}</div><div class="val">${v}</div><div class="sub">${sub}</div></div>`
+  ).join("");
+  const jobs = s.jobs_tail || s.status?.jobs?.tail || [];
+  $("jobsLog").textContent = jobs.length
+    ? jobs.slice().reverse().map(j => `${j.ts || ""}  ${j.event || j.kind || ""}  ${j.ok === false ? "FAIL" : ""}`).join("\n")
+    : t("emptyJobs");
+  const first = (s.library?.renders || [])[0];
+  if (first?.rel) setPreview(first.rel, first.name + " · " + Math.round(first.size/1024) + " KB");
+  $("ver").textContent = "v" + (s.version || "?");
+  const keys = s.doctor?.keys_present || {};
+  $("keysBox").innerHTML = Object.entries(keys).map(([k,v]) =>
+    `<div class="check ${v?"ok":""}"><span class="dot"></span><span class="mono">${k}: ${v?"present":"missing"}</span></div>`
+  ).join("") || `<p class="sub">offline OK</p>`;
+  $("doctorLog").textContent = JSON.stringify(s.doctor, null, 2);
+}
+
+function renderLibrary(lib) {
+  const items = lib.renders || [];
+  $("libList").innerHTML = items.map(it => `
+    <li>
+      <div><div><strong>${it.name}</strong></div><div class="mono">${it.rel} · ${Math.round(it.size/1024)} KB</div></div>
+      <button class="btn ghost" data-prev="${it.rel}">Preview</button>
+    </li>`).join("") || `<li>${t("emptyLib")}</li>`;
+  $("libList").onclick = (e) => {
+    const b = e.target.closest("button[data-prev]");
+    if (b) { setPreview(b.dataset.prev); setTab("overview"); }
+  };
+}
+
+function renderInbox(ib) {
+  $("inboxStats").innerHTML = `
+    <div class="check"><span class="dot"></span> pending: <b>${ib.counts?.pending||0}</b></div>
+    <div class="check ok"><span class="dot"></span> done: <b>${ib.counts?.done||0}</b></div>
+    <div class="check bad"><span class="dot"></span> refuse: <b>${ib.counts?.refuse||0}</b></div>
+    <p class="mono sub">${ib.inbox||""}</p>`;
+  $("inboxPending").innerHTML = (ib.pending||[]).map(n => `<li><span class="mono">${n}</span></li>`).join("") || `<li>${t("emptyInbox")}</li>`;
+}
+
+async function refresh() {
+  SNAP = await api("/api/snapshot");
+  renderMetrics(SNAP);
+  renderLibrary(SNAP.library || {});
+  renderInbox(SNAP.inbox || {});
+}
+
+async function pollJob(id, logEl) {
+  log(logEl, "job " + id + " running…");
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      try {
+        const j = await api("/api/job/" + id);
+        if (j.status === "running") {
+          log(logEl, "job " + id + " … " + (j.kind||""));
+          setTimeout(tick, 1200);
+          return;
+        }
+        if (j.status === "error") { log(logEl, j); reject(new Error(j.error || "job error")); return; }
+        log(logEl, j.result || j);
+        resolve(j.result || j);
+        refresh();
+      } catch (e) { reject(e); }
+    };
+    tick();
+  });
+}
+
+function renderTools() {
+  const post = (path) => api(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"});
+  const cats = [
+    [t("catCreate"), [
+      ["demo", async () => { setTab("studio"); setWb("compose"); $("btnDemo").click(); }],
+      ["cartoon", async () => { setTab("studio"); setWb("compose"); $("btnCartoon").click(); }],
+      ["ideas", async () => { setTab("studio"); setWb("ideas"); $("btnIdeas").click(); }],
+      ["inbox", async () => { setTab("queue"); $("btnInboxRun").click(); }],
+      ["montage", async () => setTab("montage")],
+    ]],
+    [t("catPolish"), [
+      ["score", async () => log($("toolsLog"), await post("/api/score"))],
+      ["styles", async () => log($("toolsLog"), await post("/api/styles"))],
+      ["chapters", async () => log($("toolsLog"), await post("/api/chapters"))],
+      ["normalize", async () => log($("toolsLog"), await post("/api/normalize"))],
+      ["icon", async () => log($("toolsLog"), await post("/api/icon"))],
+    ]],
+    [t("catShip"), [
+      ["ready", async () => { setTab("publish"); $("btnReady").click(); }],
+      ["finish", async () => { setTab("publish"); $("btnFinish").click(); }],
+      ["export", async () => { setTab("publish"); $("btnExport").click(); }],
+      ["status", async () => log($("toolsLog"), await post("/api/status"))],
+      ["jobs", async () => log($("toolsLog"), await post("/api/jobs"))],
+      ["doctor", async () => setTab("settings")],
+      ["refresh", async () => { await refresh(); toast(t("refresh")); }],
+    ]],
+  ];
+  const fns = [];
+  let html = "";
+  cats.forEach(([label, items]) => {
+    html += `<div class="section-label tools-cat">${label}</div><div class="grid tools">`;
+    items.forEach(([key, fn]) => {
+      const i = fns.length;
+      fns.push(fn);
+      const meta = I18N[LANG].tools[key] || [key, ""];
+      html += `<div class="card tool" data-i="${i}"><div class="ico">${String(meta[0]).slice(0,2).toUpperCase()}</div><h3>${meta[0]}</h3><p class="sub">${meta[1]}</p></div>`;
+    });
+    html += `</div>`;
+  });
+  window.__toolFns = fns;
+  $("toolsGrid").innerHTML = html;
+}
+
+$("toolsGrid").addEventListener("click", async (e) => {
+  const c = e.target.closest(".tool");
+  if (!c) return;
+  try {
+    await window.__toolFns[+c.dataset.i]?.();
+  } catch (err) {
+    log($("toolsLog"), String(err.message || err));
+  }
+});
+
+function setWb(name) {
+  document.querySelectorAll("#wbTabs button").forEach(b => b.classList.toggle("on", b.dataset.wb === name));
+  document.querySelectorAll(".wb").forEach(p => p.classList.toggle("on", p.id === "wb-" + name));
+}
+$("wbTabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-wb]");
+  if (b) setWb(b.dataset.wb);
+});
+
+function markChoices(rootId, selected) {
+  document.querySelectorAll("#" + rootId + " .choice").forEach(el => {
+    el.classList.toggle("on", el.dataset.key === selected);
+  });
+}
+
+function renderStudioUI() {
+  if (!STUDIO) return;
+  PREFS = STUDIO.prefs || PREFS;
+  $("prefsLog").textContent = JSON.stringify(PREFS, null, 2);
+  $("sfxToggle").checked = !!PREFS.sfx;
+
+  const tpl = STUDIO.templates || {};
+  $("tplGrid").innerHTML = Object.entries(tpl).map(([k, v]) =>
+    `<button type="button" class="choice" data-key="${k}" data-kind="template"><b>${v.label || k}</b><span>${v.inspired_by || ""}</span></button>`
+  ).join("");
+  markChoices("tplGrid", PREFS.template);
+
+  const grades = STUDIO.color_grades || {};
+  $("gradeGrid").innerHTML = Object.entries(grades).map(([k, v]) =>
+    `<button type="button" class="choice" data-key="${k}" data-kind="color_grade"><b>${v.label || k}</b><span>${k}</span></button>`
+  ).join("");
+  markChoices("gradeGrid", PREFS.color_grade);
+
+  const motion = STUDIO.motion || {};
+  $("motionGrid").innerHTML = Object.entries(motion).map(([k, v]) =>
+    `<button type="button" class="choice" data-key="${k}" data-kind="motion"><b>${v.label || k}</b><span>${k}</span></button>`
+  ).join("");
+  markChoices("motionGrid", PREFS.motion);
+
+  const moods = STUDIO.music_moods || {};
+  $("moodGrid").innerHTML = Object.entries(moods).map(([k, v]) =>
+    `<button type="button" class="choice" data-key="${k}" data-kind="music_mood"><b>${v.label || k}</b><span>${v.note || k}</span></button>`
+  ).join("");
+  markChoices("moodGrid", PREFS.music_mood);
+}
+
+async function loadStudio() {
+  STUDIO = await api("/api/studio");
+  renderStudioUI();
+}
+
+async function patchStudio(patch) {
+  const r = await api("/api/studio", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(patch),
+  });
+  PREFS = r.prefs || PREFS;
+  if (STUDIO) STUDIO.prefs = PREFS;
+  renderStudioUI();
+  toast(t("saveStudio"));
+}
+
+document.addEventListener("click", async (e) => {
+  const c = e.target.closest(".choice[data-kind]");
+  if (!c) return;
+  const kind = c.dataset.kind;
+  const key = c.dataset.key;
+  if (kind === "template") await patchStudio({ template: key });
+  else await patchStudio({ [kind]: key });
+});
+$("btnSaveStudio").onclick = async () => {
+  await patchStudio({ sfx: $("sfxToggle").checked });
+};
+$("sfxToggle").onchange = async () => {
+  await patchStudio({ sfx: $("sfxToggle").checked });
+};
+
+$("nav").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]");
+  if (b) setTab(b.dataset.tab);
+});
+$("btnBack").onclick = () => {
+  if (histIdx <= 0) return;
+  navigating = true; histIdx -= 1; setTab(hist[histIdx], {push:false}); navigating = false;
+};
+$("btnForward").onclick = () => {
+  if (histIdx >= hist.length - 1) return;
+  navigating = true; histIdx += 1; setTab(hist[histIdx], {push:false}); navigating = false;
+};
+$("btnHome").onclick = () => setTab("overview");
+
+$("langSeg").onclick = (e) => {
+  const b = e.target.closest("button[data-lang]");
+  if (!b) return;
+  LANG = b.dataset.lang;
+  localStorage.setItem("dup_ops_lang", LANG);
+  applyI18n();
+  if (SNAP) { renderMetrics(SNAP); renderLibrary(SNAP.library||{}); renderInbox(SNAP.inbox||{}); }
+};
+$("themeSeg").onclick = (e) => {
+  const b = e.target.closest("button[data-theme-btn]");
+  if (!b) return;
+  THEME = b.dataset.themeBtn;
+  applyTheme();
+  applyI18n();
+};
+
+$("btnRefresh").onclick = () => refresh().catch(e => alert(e.message));
+$("btnLibRefresh").onclick = () => refresh();
+
+$("btnDemo").onclick = async () => {
+  const r = await api("/api/demo", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({offline_tts: $("offlineTts").checked}) });
+  await pollJob(r.job_id, $("studioLog"));
+};
+$("btnCartoon").onclick = async () => {
+  const path = SNAP?.doctor?.cartoon_fixture;
+  const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ script_path: path, offline_tts: $("offlineTts").checked }) });
+  await pollJob(r.job_id, $("studioLog"));
+};
+$("btnScript").onclick = async () => {
+  const topic = $("topic").value.trim();
+  if (!topic) return alert(t("topic"));
+  const r = await api("/api/write-script", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ topic, language: $("lang").value, offline: true }) });
+  LAST_SCRIPT = r.script;
+  $("scriptOut").value = JSON.stringify(r.script, null, 2);
+  $("btnRunScript").disabled = false;
+  log($("studioLog"), { path: r.path, source: r.source, scenes: r.scenes });
+};
+$("btnRunScript").onclick = async () => {
+  if (!LAST_SCRIPT) return;
+  const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ script: LAST_SCRIPT, offline_tts: $("offlineTts").checked }) });
+  await pollJob(r.job_id, $("studioLog"));
+};
+$("btnIdeas").onclick = async () => {
+  const r = await api("/api/ideas", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ language: $("lang").value, offline: true }) });
+  const ideas = r.ideas || [];
+  $("ideasList").innerHTML = ideas.slice(0,8).map(it => {
+    const topic = it.topic || it;
+    return `<li><span>${topic}</span><button class="btn ghost" data-topic="${String(topic).replace(/"/g,'&quot;')}">${t("useTopic")}</button></li>`;
+  }).join("") || `<li>${t("emptyInbox")}</li>`;
+  $("ideasList").onclick = (e) => {
+    const b = e.target.closest("button[data-topic]");
+    if (b) { $("topic").value = b.dataset.topic; setTab("studio"); }
+  };
+  log($("studioLog"), { honesty: r.honesty || "ideas ≠ virality", count: ideas.length });
+};
+
+async function saveInbox(obj, name) {
+  const r = await api("/api/inbox/upload", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ script: obj, name }) });
+  log($("queueLog"), r); await refresh();
+}
+$("btnInboxSave").onclick = async () => {
+  try { await saveInbox(JSON.parse($("inboxPaste").value)); }
+  catch (e) { alert("JSON: " + e.message); }
+};
+$("btnInboxRun").onclick = async () => {
+  const r = await api("/api/inbox/process", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ offline_tts: $("offlineTts").checked, limit: 5 }) });
+  await pollJob(r.job_id, $("queueLog"));
+};
+$("btnInboxFixture").onclick = async () => {
+  const r = await api("/api/inbox/fixture", { method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ name: "cartoon_emotion_script.json" }) });
+  log($("queueLog"), r); await refresh();
+};
+
+const inboxDrop = $("inboxDrop");
+inboxDrop.addEventListener("dragover", e => { e.preventDefault(); inboxDrop.classList.add("drag"); });
+inboxDrop.addEventListener("dragleave", () => inboxDrop.classList.remove("drag"));
+inboxDrop.addEventListener("drop", async e => {
+  e.preventDefault(); inboxDrop.classList.remove("drag");
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  const text = await f.text(); $("inboxPaste").value = text; await saveInbox(JSON.parse(text), f.name);
+});
+
+(function wireAssetDrop() {
+  const box = $("assetDrop"); const file = $("assetFile");
+  box.onclick = () => file.click();
+  box.ondragover = e => { e.preventDefault(); box.classList.add("drag"); };
+  box.ondragleave = () => box.classList.remove("drag");
+  const send = async (f) => {
+    const reader = new FileReader();
+    const dataUrl = await new Promise((res, rej) => { reader.onload = () => res(reader.result); reader.onerror = () => rej(reader.error); reader.readAsDataURL(f); });
+    const pure = String(dataUrl).split(",")[1] || "";
+    const r = await api("/api/upload/asset", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ filename: f.name, b64: pure, kind: $("assetKind").value }) });
+    log($("libLog"), r);
+  };
+  box.ondrop = async e => { e.preventDefault(); box.classList.remove("drag"); if (e.dataTransfer.files[0]) await send(e.dataTransfer.files[0]); };
+  file.onchange = async () => { if (file.files[0]) await send(file.files[0]); };
+})();
+
+$("btnReady").onclick = async () => {
+  const r = await api("/api/ready", { method:"POST", headers:{"Content-Type":"application/json"}, body: "{}" });
+  $("readyChecks").innerHTML = (r.checks||[]).map(c =>
+    `<div class="check ${c.ok?"ok":"bad"}"><span class="dot"></span>${c.name}: ${c.detail||""}</div>`
+  ).join("");
+  $("ver").className = "badge " + (r.ready ? "ok" : "bad");
+  $("ver").textContent = r.ready ? "READY" : "NOT READY";
+  log($("pubLog"), r);
+};
+$("btnFinish").onclick = async () => {
+  log($("pubLog"), await api("/api/finish", { method:"POST", headers:{"Content-Type":"application/json"}, body: "{}" }));
+  await refresh();
+};
+$("btnExport").onclick = async () => {
+  log($("pubLog"), await api("/api/export", { method:"POST", headers:{"Content-Type":"application/json"}, body: "{}" }));
+};
+
+window.addEventListener("keydown", (e) => {
+  if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); $("btnBack").click(); }
+  if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); $("btnForward").click(); }
+});
+
+function PathName(rel) { return String(rel).split("/").pop(); }
+function cloneTl() { return JSON.parse(JSON.stringify(TIMELINE)); }
+function setDirty(v) {
+  DIRTY = !!v;
+  const b = $("dirtyBadge");
+  if (b) b.style.display = DIRTY ? "inline-flex" : "none";
+  $("btnUndo").disabled = undoStack.length === 0;
+  $("btnRedo").disabled = redoStack.length === 0;
+}
+function pushUndo() {
+  undoStack.push(cloneTl());
+  if (undoStack.length > 40) undoStack.shift();
+  redoStack = [];
+  setDirty(true);
+}
+function applyTl(next, {record=false} = {}) {
+  if (record) pushUndo();
+  TIMELINE = next;
+  renderTimeline();
+  setDirty(true);
+}
+function renderMediaList() {
+  $("mediaList").innerHTML = MEDIA.map(it => `
+    <li data-rel="${it.rel}" class="${SELECTED===it.rel?"selected":""}">
+      <div>
+        <div><strong>${it.name}</strong> · <span class="mono">${it.kind}</span></div>
+        <div class="mono">${it.duration_sec != null ? it.duration_sec + "s · " : ""}${Math.round((it.size||0)/1024)} KB</div>
+      </div>
+      <div class="mini">
+        <button class="btn ghost" data-add="${it.rel}" data-path="${it.path}" data-kind="${it.kind}" data-name="${it.name}">${t("addTl")}</button>
+        <button class="btn ghost" data-del-media="${it.rel}">${t("btnDel")}</button>
+      </div>
+    </li>`).join("") || `<li>${t("emptyMedia")}</li>`;
+  $("selMeta").textContent = SELECTED ? ("selected: " + SELECTED) : "";
+}
+function renderTimeline() {
+  $("timelineList").innerHTML = TIMELINE.map((c, i) => `
+    <li data-ti="${i}" class="${TL_INDEX===i?"selected":""}">
+      <div>
+        <div><strong>${i+1}. ${c.name || c.rel}</strong></div>
+        <div class="mono">start=${c.start_sec||0}s${c.duration_sec!=null?" · dur="+c.duration_sec+"s":""}</div>
+      </div>
+      <div class="mini">
+        <button class="btn ghost" data-up="${i}" title="Move up">${t("moveUp")}</button>
+        <button class="btn ghost" data-down="${i}" title="Move down">${t("moveDown")}</button>
+        <button class="btn ghost" data-dup="${i}">${t("btnDup")}</button>
+        <button class="btn ghost" data-rm="${i}">${t("btnDel")}</button>
+      </div>
+    </li>`).join("") || `<li>${t("emptyTl")}</li>`;
+  setDirty(DIRTY);
+}
+async function loadMedia() {
+  const r = await api("/api/media/list");
+  MEDIA = r.items || [];
+  if (!DIRTY) TIMELINE = (r.timeline && r.timeline.clips) || TIMELINE;
+  renderMediaList();
+  renderTimeline();
+}
+async function persistTimeline({quiet=false} = {}) {
+  // CapCut-style: save timeline + project.json together
+  const r = await api("/api/project/save", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ clips: TIMELINE, meta: { lang: LANG } }),
+  });
+  setDirty(false);
+  renderTimeline();
+  if (!quiet) toast(t("savedOk"));
+  log($("montageLog"), r);
+  return r;
+}
+
+$("btnExportMontage").onclick = async () => {
+  await persistTimeline({quiet:true});
+  // ensure stitch exists — if not, render first
+  let r = await api("/api/montage/export", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+  });
+  const needRender = (x) => !x.ok && /stitch|Склеить|render timeline/i.test(String(x.error||x.next||""));
+  if (needRender(r)) {
+    const job = await api("/api/timeline/render", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+    });
+    await pollJob(job.job_id, $("montageLog"));
+    r = await api("/api/montage/export", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+    });
+  }
+  log($("montageLog"), r);
+  if (r.ok) {
+    toast(t("exportedOk"));
+    if (r.mp4_rel) $("montagePreview").src = mediaUrl(r.mp4_rel);
+  } else {
+    alert(r.error || r.message_ru || "export failed");
+  }
+};
+
+$("btnSendMontage").onclick = async () => {
+  await persistTimeline({quiet:true});
+  const mode = $("sendMode").value || "export";
+  let r = await api("/api/montage/send", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ mode }),
+  });
+  const needRender = (x) => !x.ok && /stitch|Склеить|render timeline/i.test(String(x.error||x.next||""));
+  if (needRender(r)) {
+    const job = await api("/api/timeline/render", {
+      method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+    });
+    await pollJob(job.job_id, $("montageLog"));
+    r = await api("/api/montage/send", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ mode }),
+    });
+  }
+  log($("montageLog"), r);
+  toast(r.message_ru || r.message_en || t("sentOk"));
+  if (r.mp4_rel) $("montagePreview").src = mediaUrl(r.mp4_rel);
+};
+
+$("btnLoadProject").onclick = async () => {
+  const r = await api("/api/project");
+  log($("montageLog"), r);
+  const clips = r.project?.timeline?.clips || r.timeline?.clips;
+  if (Array.isArray(clips)) {
+    pushUndo();
+    TIMELINE = clips;
+    setDirty(false);
+    renderTimeline();
+    toast(t("loadProject"));
+  }
+};
+
+$("mediaList").addEventListener("click", async (e) => {
+  const del = e.target.closest("button[data-del-media]");
+  const b = e.target.closest("button[data-add]");
+  const li = e.target.closest("li[data-rel]");
+  if (li) {
+    SELECTED = li.dataset.rel;
+    renderMediaList();
+    if (SELECTED) $("montagePreview").src = mediaUrl(SELECTED);
+  }
+  if (del) {
+    e.stopPropagation();
+    if (!confirm(t("confirmDel"))) return;
+    const r = await api("/api/media/delete", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ rel: del.dataset.delMedia }),
+    });
+    log($("montageLog"), r);
+    if (SELECTED === del.dataset.delMedia) SELECTED = null;
+    await loadMedia();
+    return;
+  }
+  if (!b) return;
+  e.stopPropagation();
+  pushUndo();
+  TIMELINE.push({
+    rel: b.dataset.add, path: b.dataset.path, name: b.dataset.name,
+    kind: b.dataset.kind, start_sec: 0,
+  });
+  renderTimeline();
+  setDirty(true);
+  toast(t("addTl"));
+});
+
+$("timelineList").addEventListener("click", async (e) => {
+  const li = e.target.closest("li[data-ti]");
+  if (li && !e.target.closest("button")) {
+    TL_INDEX = +li.dataset.ti;
+    const c = TIMELINE[TL_INDEX];
+    if (c?.rel) { SELECTED = c.rel; $("montagePreview").src = mediaUrl(c.rel); }
+    if (c) {
+      $("trimStart").value = c.start_sec || 0;
+      $("trimDur").value = c.duration_sec != null ? c.duration_sec : "";
+    }
+    renderMediaList();
+    renderTimeline();
+    return;
+  }
+  const rm = e.target.closest("button[data-rm]");
+  const up = e.target.closest("button[data-up]");
+  const down = e.target.closest("button[data-down]");
+  const dup = e.target.closest("button[data-dup]");
+  if (rm) {
+    pushUndo();
+    TIMELINE.splice(+rm.dataset.rm, 1);
+    if (TL_INDEX === +rm.dataset.rm) TL_INDEX = null;
+    renderTimeline(); setDirty(true); return;
+  }
+  if (dup) {
+    const i = +dup.dataset.dup;
+    pushUndo();
+    TIMELINE.splice(i + 1, 0, JSON.parse(JSON.stringify(TIMELINE[i])));
+    renderTimeline(); setDirty(true); return;
+  }
+  if (up) {
+    const i = +up.dataset.up;
+    if (i <= 0) return;
+    pushUndo();
+    [TIMELINE[i-1], TIMELINE[i]] = [TIMELINE[i], TIMELINE[i-1]];
+    TL_INDEX = i - 1;
+    renderTimeline(); setDirty(true); return;
+  }
+  if (down) {
+    const i = +down.dataset.down;
+    if (i >= TIMELINE.length - 1) return;
+    pushUndo();
+    [TIMELINE[i+1], TIMELINE[i]] = [TIMELINE[i], TIMELINE[i+1]];
+    TL_INDEX = i + 1;
+    renderTimeline(); setDirty(true); return;
+  }
+});
+
+$("btnUndo").onclick = () => {
+  if (!undoStack.length) return;
+  redoStack.push(cloneTl());
+  TIMELINE = undoStack.pop();
+  renderTimeline(); setDirty(true);
+};
+$("btnRedo").onclick = () => {
+  if (!redoStack.length) return;
+  undoStack.push(cloneTl());
+  TIMELINE = redoStack.pop();
+  renderTimeline(); setDirty(true);
+};
+$("btnSaveTl").onclick = () => persistTimeline();
+$("btnClearTl").onclick = async () => {
+  if (!TIMELINE.length) return;
+  if (!confirm(t("confirmClear"))) return;
+  pushUndo();
+  TIMELINE = [];
+  TL_INDEX = null;
+  renderTimeline(); setDirty(true);
+  await persistTimeline({quiet:true});
+};
+$("btnDeselect").onclick = () => {
+  SELECTED = null; TL_INDEX = null;
+  renderMediaList(); renderTimeline();
+  $("selMeta").textContent = "";
+};
+$("btnDup").onclick = () => {
+  const i = TL_INDEX != null ? TL_INDEX : TIMELINE.length - 1;
+  if (i < 0 || !TIMELINE[i]) return;
+  pushUndo();
+  TIMELINE.splice(i + 1, 0, JSON.parse(JSON.stringify(TIMELINE[i])));
+  renderTimeline(); setDirty(true);
+};
+
+(function wireMediaDrop() {
+  const box = $("mediaDrop"); const file = $("mediaFile");
+  box.onclick = () => file.click();
+  box.ondragover = e => { e.preventDefault(); box.classList.add("drag"); };
+  box.ondragleave = () => box.classList.remove("drag");
+  const send = async (f) => {
+    const reader = new FileReader();
+    const dataUrl = await new Promise((res, rej) => {
+      reader.onload = () => res(reader.result);
+      reader.onerror = () => rej(reader.error);
+      reader.readAsDataURL(f);
+    });
+    const pure = String(dataUrl).split(",")[1] || "";
+    const r = await api("/api/media/upload", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ filename: f.name, b64: pure }),
+    });
+    log($("montageLog"), r);
+    await loadMedia();
+  };
+  box.ondrop = async e => {
+    e.preventDefault(); box.classList.remove("drag");
+    for (const f of [...e.dataTransfer.files]) await send(f);
+  };
+  file.onchange = async () => {
+    for (const f of [...file.files]) await send(f);
+    file.value = "";
+  };
+})();
+
+$("btnImportUrl").onclick = async () => {
+  const url = $("mediaUrl").value.trim();
+  if (!url) return;
+  const r = await api("/api/media/import", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ url, allow_network: $("onlineNet").checked }),
+  });
+  log($("montageLog"), r);
+  if (r.ok) { $("mediaUrl").value = ""; await loadMedia(); }
+};
+
+$("btnTrim").onclick = async () => {
+  if (!SELECTED && !TIMELINE.length) return alert(t("emptyMedia"));
+  const rel = SELECTED || (TIMELINE[TIMELINE.length-1] && TIMELINE[TIMELINE.length-1].rel);
+  const body = { rel, start_sec: +$("trimStart").value || 0, width: 1080, height: 1920 };
+  const d = $("trimDur").value;
+  if (d !== "" && d != null) body.duration_sec = +d;
+  const r = await api("/api/media/trim", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body),
+  });
+  log($("montageLog"), r);
+  if (r.ok && r.rel) {
+    pushUndo();
+    // If a timeline clip is selected, replace in place (CapCut trim feel); else append
+    const clip = { rel: r.rel, path: r.path, name: PathName(r.rel), kind: "video", start_sec: 0, duration_sec: r.duration_sec };
+    if (TL_INDEX != null && TIMELINE[TL_INDEX]) TIMELINE[TL_INDEX] = clip;
+    else TIMELINE.push(clip);
+    renderTimeline(); setDirty(true);
+    $("montagePreview").src = mediaUrl(r.rel);
+    await loadMedia();
+  }
+};
+
+$("btnImgClip").onclick = async () => {
+  if (!SELECTED) return alert(t("emptyMedia"));
+  const r = await api("/api/media/image-clip", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ rel: SELECTED, duration_sec: +($("trimDur").value || 3), width: 1080, height: 1920 }),
+  });
+  log($("montageLog"), r);
+  if (r.ok && r.rel) {
+    pushUndo();
+    TIMELINE.push({ rel: r.rel, path: r.path, name: PathName(r.rel), kind: "video", start_sec: 0, duration_sec: r.duration_sec });
+    renderTimeline(); setDirty(true);
+    $("montagePreview").src = mediaUrl(r.rel);
+    await loadMedia();
+  }
+};
+
+$("btnRenderTl").onclick = async () => {
+  await persistTimeline({quiet:true});
+  const r = await api("/api/timeline/render", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+  });
+  const result = await pollJob(r.job_id, $("montageLog"));
+  if (result && result.latest_rel) {
+    $("montagePreview").src = mediaUrl(result.latest_rel);
+    setPreview(result.latest_rel, "montage stitch");
+  }
+  await loadMedia();
+};
+
+window.addEventListener("keydown", (e) => {
+  const tag = (e.target && e.target.tagName) || "";
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+    e.preventDefault(); $("btnUndo").click();
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) {
+    e.preventDefault(); $("btnRedo").click();
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault(); $("btnSaveTl").click();
+  }
+  if ((e.key === "Delete" || e.key === "Backspace") && TL_INDEX != null) {
+    e.preventDefault();
+    pushUndo();
+    TIMELINE.splice(TL_INDEX, 1);
+    TL_INDEX = null;
+    renderTimeline(); setDirty(true);
+  }
+});
+
+applyTheme();
+applyI18n();
+updateChrome();
+
+// --- visual upgrade hooks ---
+document.querySelectorAll("[data-jump]").forEach(b => {
+  b.addEventListener("click", () => setTab(b.getAttribute("data-jump")));
+});
+function renderRecentThumbs() {
+  const items = (SNAP?.library?.renders || []).slice(0, 8);
+  const el = $("recentThumbs");
+  if (!el) return;
+  el.innerHTML = items.map(it => `<button type="button" data-prev="${it.rel}"><div class="t">${it.name}</div><div class="s">${Math.round((it.size||0)/1024)}KB</div></button>`).join("") || `<span class="sub">${t("emptyLib")}</span>`;
+  el.onclick = (e) => {
+    const b = e.target.closest("button[data-prev]");
+    if (!b) return;
+    setPreview(b.dataset.prev); setTab("overview");
+  };
+}
+const _refresh = refresh;
+refresh = async function() {
+  await _refresh();
+  renderRecentThumbs();
+  const cards = document.querySelectorAll("#metrics .card");
+  const colors = ["sky","mint","amber","coral"];
+  cards.forEach((c,i) => {
+    c.classList.add("glow-" + colors[i % colors.length]);
+    if (!c.querySelector(".metric-top")) {
+      const bar = document.createElement("div");
+      bar.className = "metric-top " + colors[i % colors.length];
+      c.prepend(bar);
+    }
+  });
+  if ($("pathChip") && SNAP?.doctor) {
+    const d = SNAP.doctor;
+    $("pathChip").textContent = [d.out, d.export, d.montage, d.inbox].filter(Boolean).join(" · ");
+  }
+  if ($("globalOnline") && $("onlineNet")) {
+    $("globalOnline").checked = $("onlineNet").checked;
+  }
+};
+async function openPath(which) {
+  const r = await api("/api/open", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ which }),
+  });
+  toast(r.path || r.error || which);
+  const logEl = $("doctorLog") || $("pubLog") || $("montageLog");
+  if (logEl) log(logEl, r);
+}
+["btnOpenExport","btnOpenExport2"].forEach(id => { const el=$(id); if(el) el.onclick = () => openPath("export"); });
+const bo=$("btnOpenOut"); if(bo) bo.onclick = () => openPath("out");
+const ba=$("btnOpenAssets"); if(ba) ba.onclick = () => openPath("assets");
+const br=$("btnOpenRoot"); if(br) br.onclick = () => openPath("root");
+const bi=$("btnOpenInbox"); if(bi) bi.onclick = () => openPath("inbox");
+const bi2=$("btnOpenInbox2"); if(bi2) bi2.onclick = () => openPath("inbox");
+const bm=$("btnOpenMontage"); if(bm) bm.onclick = () => openPath("montage");
+const ls=$("libSearch");
+if (ls) {
+  ls.addEventListener("input", () => {
+    const q = ls.value.toLowerCase();
+    document.querySelectorAll("#libList li").forEach(li => {
+      li.style.display = !q || li.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  });
+}
+const r2=$("btnReady2"); if(r2) r2.onclick = () => $("btnReady").click();
+const f2=$("btnFinish2"); if(f2) f2.onclick = () => $("btnFinish").click();
+const e2=$("btnExport2"); if(e2) e2.onclick = () => $("btnExport").click();
+const tt=$("btnTiktokSend");
+if (tt) tt.onclick = async () => {
+  const r = await api("/api/montage/send", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ mode: "tiktok" }),
+  });
+  log($("pubLog"), r);
+  toast(r.message_ru || r.message_en || "tiktok");
+};
+const dry=$("btnInboxDry");
+if (dry) dry.onclick = async () => {
+  const r = await api("/api/inbox");
+  log($("queueLog"), { dry_run: true, pending: r.pending, counts: r.counts });
+  toast(t("dryRun"));
+};
+const go=$("globalOnline");
+if (go) go.onchange = () => { if ($("onlineNet")) $("onlineNet").checked = go.checked; };
+const dr=$("btnDoctorRefresh");
+if (dr) dr.onclick = async () => {
+  const d = await api("/api/doctor");
+  $("doctorLog").textContent = JSON.stringify(d, null, 2);
+  toast("doctor");
+};
+const cd=$("btnCopyDoctor");
+if (cd) cd.onclick = async () => {
+  try { await navigator.clipboard.writeText($("doctorLog").textContent); toast("copied"); } catch(e) { toast(String(e)); }
+};
+const cs=$("btnCopyScript");
+if (cs) cs.onclick = async () => {
+  try { await navigator.clipboard.writeText($("scriptOut").value || ""); toast(t("copyScript")); } catch(e) {}
+};
+
+(function(){
+  const aspect = localStorage.getItem("dupAspect") || "9:16";
+  function markAspect(v, notify) {
+    localStorage.setItem("dupAspect", v);
+    ["btnAspect916","btnAspect11","btnAspect169"].forEach(id => {
+      const el = $(id); if (!el) return;
+      const map = {btnAspect916:"9:16", btnAspect11:"1:1", btnAspect169:"16:9"};
+      el.classList.toggle("aspect-on", map[id] === v);
+    });
+    if (notify) toast("aspect " + v);
+  }
+  const a916=$("btnAspect916"); if(a916) a916.onclick = () => markAspect("9:16", true);
+  const a11=$("btnAspect11"); if(a11) a11.onclick = () => markAspect("1:1", true);
+  const a169=$("btnAspect169"); if(a169) a169.onclick = () => markAspect("16:9", true);
+  markAspect(aspect, false);
+})();
+
+
+
+Promise.all([refresh(), loadStudio(), loadMedia()]).catch(e => { $("jobsLog").textContent = String(e); });
+</script>
+</body>
+</html>

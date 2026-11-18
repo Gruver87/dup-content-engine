@@ -72,6 +72,19 @@ python -m content_engine instagram "$mp4" --pack "$pack" --dry-run
 python -m content_engine avatar --dry-run
 ok dry-runs
 
+step "10b) ship kit offline"
+python -m content_engine copy --pack "$pack" --out out/copy/COPY.json
+python -m content_engine bundle "$mp4" --pack "$pack" --srt "$srt" --thumb "$thumb" --out out/ship --with-copy
+python -m content_engine icon --out out/brand/icon_1024.png
+python -m content_engine styles
+python -m content_engine status
+python -m content_engine chapters --script fixtures/demo_script.json --out out/chapters/CHAPTERS.json
+python -m content_engine write-script "доказательства" --language ru --offline --out out/scripts/ru_demo.json
+python -m content_engine inbox --dry-run
+python -m content_engine ready --out out/demo
+python -m content_engine day topics.ru.example.txt --out out/series_ru --scripts-only --language ru
+ok ship-kit
+
 if [[ "$SKIP_SERIES" -eq 0 ]]; then
   step "11) day scripts-only"
   python -m content_engine day topics.example.txt --out out/series --scripts-only

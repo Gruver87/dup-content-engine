@@ -6,19 +6,74 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
+def _flatten_scene_dict(d: dict[str, Any], idx: int) -> list[dict[str, Any]]:
+    """Expand optional lines[] into one scene per spoken beat (voice↔caption sync)."""
+    lines = d.get("lines")
+    if not isinstance(lines, list) or not lines:
+        return [d]
+    base_id = str(d.get("id") or f"scene_{idx:02d}")
+    base_vq = str(d.get("visual_query") or d.get("visual_query_en") or "abstract")
+    out: list[dict[str, Any]] = []
+    for j, line in enumerate(lines):
+        if isinstance(line, str):
+            line = {"text": line}
+        if not isinstance(line, dict):
+            continue
+        out.append(
+            {
+                "id": str(line.get("id") or f"{base_id}_L{j}"),
+                "text": str(line.get("text") or "").strip(),
+                "visual_query": str(
+                    line.get("visual_query") or line.get("visual_query_en") or base_vq
+                ).strip(),
+                "emotion": line.get("emotion", d.get("emotion")),
+                "speaker": line.get("speaker", d.get("speaker")),
+                "gender": line.get("gender", d.get("gender")),
+                "voice": line.get("voice", d.get("voice")),
+            }
+        )
+    return out or [d]
+
+
 @dataclass
 class Scene:
     id: str
     text: str
     visual_query: str
+    emotion: str | None = None
+    speaker: str | None = None
+    gender: str | None = None
+    voice: str | None = None
 
     @staticmethod
     def from_dict(d: dict[str, Any], idx: int) -> Scene:
         return Scene(
             id=str(d.get("id") or f"scene_{idx:02d}"),
             text=str(d.get("text") or "").strip(),
-            visual_query=str(d.get("visual_query") or d.get("visual_query_en") or "abstract").strip(),
+            visual_query=str(
+                d.get("visual_query") or d.get("visual_query_en") or "abstract"
+            ).strip(),
+            emotion=(str(d["emotion"]).strip() if d.get("emotion") else None),
+            speaker=(str(d["speaker"]).strip() if d.get("speaker") else None),
+            gender=(str(d["gender"]).strip().lower() if d.get("gender") else None),
+            voice=(str(d["voice"]).strip() if d.get("voice") else None),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        row: dict[str, Any] = {
+            "id": self.id,
+            "text": self.text,
+            "visual_query": self.visual_query,
+        }
+        if self.emotion:
+            row["emotion"] = self.emotion
+        if self.speaker:
+            row["speaker"] = self.speaker
+        if self.gender:
+            row["gender"] = self.gender
+        if self.voice:
+            row["voice"] = self.voice
+        return row
 
 
 @dataclass
@@ -36,7 +91,12 @@ class Script:
         scenes_raw = d.get("scenes") or []
         if not isinstance(scenes_raw, list) or not scenes_raw:
             raise ValueError("script.scenes must be a non-empty list")
-        scenes = [Scene.from_dict(s, i) for i, s in enumerate(scenes_raw)]
+        flat: list[dict[str, Any]] = []
+        for i, s in enumerate(scenes_raw):
+            if not isinstance(s, dict):
+                raise ValueError(f"scene[{i}] must be an object")
+            flat.extend(_flatten_scene_dict(s, i))
+        scenes = [Scene.from_dict(s, i) for i, s in enumerate(flat)]
         for s in scenes:
             if not s.text:
                 raise ValueError(f"scene {s.id} has empty text")
@@ -58,7 +118,7 @@ class Script:
             "tags": list(self.tags),
             "language": self.language,
             "aspect": self.aspect,
-            "scenes": [asdict(s) for s in self.scenes],
+            "scenes": [s.to_dict() for s in self.scenes],
         }
 
 

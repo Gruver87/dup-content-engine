@@ -91,6 +91,28 @@ Require-Ok "instagram dry-run"
 python -m content_engine avatar --dry-run
 Require-Ok "avatar dry-run"
 
+Step "10b) ship kit offline (copy + bundle + icon)"
+python -m content_engine copy --pack $pack.FullName --out out/copy/COPY.json
+Require-Ok "copy"
+python -m content_engine bundle $mp4.FullName --pack $pack.FullName --srt $srt.FullName --thumb $thumb.FullName --out out/ship --with-copy
+Require-Ok "bundle"
+python -m content_engine icon --out out/brand/icon_1024.png
+Require-Ok "icon"
+python -m content_engine styles
+Require-Ok "styles"
+python -m content_engine status
+Require-Ok "status"
+python -m content_engine chapters --script fixtures/demo_script.json --out out/chapters/CHAPTERS.json
+Require-Ok "chapters"
+python -m content_engine write-script "доказательства" --language ru --offline --out out/scripts/ru_demo.json
+Require-Ok "write-script-ru"
+python -m content_engine inbox --dry-run
+Require-Ok "inbox dry-run"
+python -m content_engine ready --out out/demo
+Require-Ok "ready"
+python -m content_engine day topics.ru.example.txt --out out/series_ru --scripts-only --language ru
+Require-Ok "day-ru-scripts"
+
 if (-not $SkipSeries) {
   Step "11) day series scripts-only (A/B без долгого render)"
   python -m content_engine day topics.example.txt --out out/series --scripts-only

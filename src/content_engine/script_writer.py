@@ -18,41 +18,77 @@ def _slug(topic: str) -> str:
 def offline_topic_script(topic: str, *, language: str = "en") -> Script:
     """Deterministic 5-scene Short from a topic — no network."""
     t = topic.strip().rstrip(".")
-    scenes = [
-        {
-            "id": "hook",
-            "text": f"Most people get {t} wrong. Here is the fail-closed version in under thirty seconds.",
-            "visual_query": f"{t} abstract dark interface",
-        },
-        {
-            "id": "problem",
-            "text": f"Silent green checks hide missing evidence. If {t} cannot prove itself, stop — do not fake confidence.",
-            "visual_query": "warning alert dashboard dark mode",
-        },
-        {
-            "id": "method",
-            "text": f"Script the claim, render the proof, run a policy gate, then ship a hashable pack for {t}.",
-            "visual_query": "software pipeline diagram futuristic",
-        },
-        {
-            "id": "proof",
-            "text": "Works on a laptop without a GPU: TTS, stock or synthetic visuals, FFmpeg, and an honest refuse path.",
-            "visual_query": "laptop coding desk night",
-        },
-        {
-            "id": "cta",
-            "text": f"Build verifiable tools around {t}. Follow for industrial agent skills — not marketing screenshots.",
-            "visual_query": "github code scroll abstract",
-        },
-    ]
+    lang = (language or "en").lower().split("-")[0]
+    if lang == "ru":
+        scenes = [
+            {
+                "id": "hook",
+                "text": f"Большинство ошибаются насчёт «{t}». Вот fail-closed версия за тридцать секунд.",
+                "visual_query": f"{t} abstract dark interface",
+            },
+            {
+                "id": "problem",
+                "text": f"Тихий зелёный статус прячет дыры в доказательствах. Если «{t}» не доказывает себя — стоп, без фальшивой уверенности.",
+                "visual_query": "warning alert dashboard dark mode",
+            },
+            {
+                "id": "method",
+                "text": f"Скрипт → рендер → policy gate → хэшируемый pack для «{t}».",
+                "visual_query": "software pipeline diagram futuristic",
+            },
+            {
+                "id": "proof",
+                "text": "Работает на ноутбуке без GPU: TTS, synthetic/stock, FFmpeg и честный REFUSE.",
+                "visual_query": "laptop coding desk night",
+            },
+            {
+                "id": "cta",
+                "text": f"Собирай проверяемые инструменты вокруг «{t}». Не маркетинговые скриншоты — evidence.",
+                "visual_query": "github code scroll abstract",
+            },
+        ]
+        title = f"{t} — шортс 30с"
+        description = (
+            f"Офлайн-скрипт по теме: {t}. Учебный промо-гайд — ALLOW ≠ рост аудитории."
+        )
+    else:
+        scenes = [
+            {
+                "id": "hook",
+                "text": f"Most people get {t} wrong. Here is the fail-closed version in under thirty seconds.",
+                "visual_query": f"{t} abstract dark interface",
+            },
+            {
+                "id": "problem",
+                "text": f"Silent green checks hide missing evidence. If {t} cannot prove itself, stop — do not fake confidence.",
+                "visual_query": "warning alert dashboard dark mode",
+            },
+            {
+                "id": "method",
+                "text": f"Script the claim, render the proof, run a policy gate, then ship a hashable pack for {t}.",
+                "visual_query": "software pipeline diagram futuristic",
+            },
+            {
+                "id": "proof",
+                "text": "Works on a laptop without a GPU: TTS, stock or synthetic visuals, FFmpeg, and an honest refuse path.",
+                "visual_query": "laptop coding desk night",
+            },
+            {
+                "id": "cta",
+                "text": f"Build verifiable tools around {t}. Follow for industrial agent skills — not marketing screenshots.",
+                "visual_query": "github code scroll abstract",
+            },
+        ]
+        title = f"{t} — 30s short"
+        description = (
+            f"Auto-written offline script for topic: {t}. "
+            "Promo/education aid — ALLOW ≠ audience growth."
+        )
     return Script.from_dict(
         {
             "schema": "dup.content_script.v1",
-            "title": f"{t} — 30s short",
-            "description": (
-                f"Auto-written offline script for topic: {t}. "
-                "Promo/education aid — ALLOW ≠ audience growth."
-            ),
+            "title": title,
+            "description": description,
             "tags": ["dup-labs", "shorts", _slug(t), "auto-script"],
             "language": language,
             "aspect": "9:16",

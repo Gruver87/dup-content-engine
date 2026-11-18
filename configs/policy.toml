@@ -4,7 +4,7 @@
 [policy]
 version = 1
 name = "dup-content-default"
-max_posts_per_day = 3
+max_posts_per_day = 8
 min_gap_hours = 3.0
 
 [media]
@@ -25,15 +25,26 @@ require_portrait = true
 scene_fade_sec = 0.12
 # Soft audio loudness floor (mean_volume dB); below → soft warn
 min_mean_volume_db = -45.0
+# Optional ffmpeg loudnorm before gate (offline polish)
+loudnorm = false
 
 [voice]
 # provider: edge | elevenlabs | azure | offline
 provider = "edge"
 # edge-tts neural voices (no API key)
 voice = "en-US-ChristopherNeural"
-# Alternatives: ru-RU-DmitryNeural, en-US-JennyNeural, ru-RU-SvetlanaNeural
+# Auto-used when script.language starts with ru
+voice_ru = "ru-RU-DmitryNeural"
+# Character bank (optional overrides)
+# voice_female = "ru-RU-SvetlanaNeural"
+# voice_male = "ru-RU-DmitryNeural"
+# voice_child = "ru-RU-SvetlanaNeural"
+# Alternatives: en-US-JennyNeural, en-US-GuyNeural, ru-RU-SvetlanaNeural
 # elevenlabs: set ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID (voice field ignored or used as id)
-rate = "+8%"
+# Slight briskness; comma pauses softened in speakable_text()
+rate = "+5%"
+# Heuristic emotion → rate/volume/pitch (scene.emotion or keywords). Not film-frame AI.
+emotion = true
 
 [visuals]
 # synthetic | pexels | pixabay | auto (stock then synthetic)

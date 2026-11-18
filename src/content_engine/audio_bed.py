@@ -91,8 +91,15 @@ def mix_voice_with_bed(
         )
         note = f"music_file={bed_src.name}"
     else:
-        generate_soft_bed(bed, dur)
-        note = "music_bed=generated_sine"
+        mood = str(audio.get("music_mood") or "warm")
+        try:
+            from content_engine.studio_kit import generate_mood_bed
+
+            generate_mood_bed(bed, dur, mood)
+            note = f"music_bed=mood:{mood}"
+        except Exception:  # noqa: BLE001
+            generate_soft_bed(bed, dur)
+            note = "music_bed=generated_sine"
 
     vol = float(audio.get("music_volume") or 0.10)
     run_ffmpeg(

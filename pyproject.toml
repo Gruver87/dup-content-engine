@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dup-content-engine"
-version = "0.1.6"
+version = "0.1.19"
 description = "Fail-closed laptop media pipeline: script → TTS → stock/synth visuals → FFmpeg → evidence pack"
 readme = "README.md"
 license = { text = "MIT" }
@@ -52,6 +52,9 @@ Related = "https://github.com/Gruver87/dup-lab"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+content_engine = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

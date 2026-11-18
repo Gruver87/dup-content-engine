@@ -33,8 +33,12 @@ script.json ──► TTS ──► scene clips ──► FFmpeg mux
 ```bash
 python -m pip install -e ".[dev]"
 python -m content_engine doctor
+# Local ops console (browser control room — studio / inbox / ship):
+python -m content_engine console
 python -m content_engine demo --out out/demo
-# CI / no network TTS:
+# Spoken voice (edge-tts) + captions from the same scene text:
+# python -m content_engine demo --out out/demo
+# CI / no network — tone bed instead of speech:
 python -m content_engine demo --out out/demo --offline-tts
 ```
 
@@ -85,6 +89,19 @@ Artifacts land under `out/demo/`:
 | `dup-content day topics.txt` | Today's best A/B → offline render |
 | `dup-content series topics.txt --limit N` | Multi-topic series + AB report |
 | `dup-content jobs` | Local jobs.jsonl tail |
+| `dup-content copy --script …` | Offline caption/hashtags for manual paste |
+| `dup-content bundle video.mp4 --pack …` | ALLOW ship folder/zip (no keys) |
+| `dup-content icon` | Local 1024×1024 brand PNG |
+| `dup-content styles` | List caption presets (`clean`/`boxed`/`bold`) |
+| `dup-content normalize video.mp4` | Optional loudnorm polish |
+| `dup-content status` | Local audit/jobs digest |
+| `dup-content chapters --script …` | Paste-ready YT chapter marks |
+| `dup-content inbox` | Process `inbox/*.json` offline |
+| `dup-content ready --out out/demo` | Checklist: ALLOW artifacts for manual ship |
+| `dup-content finish video.mp4 --pack …` | Copy + ship zip (no auto-post) |
+| `dup-content day topics.ru.example.txt --language ru` | RU day short + finish kit |
+| `dup-content tiktok-refresh` | Refresh access token via refresh_token |
+| `dup-content ideas --language ru` | Topic ideas (not a virality claim) |
 
 ## Policy
 

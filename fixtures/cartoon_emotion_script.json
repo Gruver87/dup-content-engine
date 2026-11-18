@@ -1,0 +1,49 @@
+{
+  "schema": "dup.content_script.v1",
+  "title": "Лиса и шёпот леса",
+  "description": "Короткий мульт-демо: эмоции → громкость/интонация, реплики персонажей совпадают с титрами. Не претензия на кино-ИИ.",
+  "tags": ["cartoon", "characters", "demo", "dup-labs"],
+  "language": "ru",
+  "aspect": "9:16",
+  "visual_style": "cartoon",
+  "scenes": [
+    {
+      "id": "n1",
+      "speaker": "narrator",
+      "emotion": "calm",
+      "text": "В тихом лесу кто-то шёл очень осторожно.",
+      "visual_query": "cartoon forest soft light character silhouette"
+    },
+    {
+      "id": "fox1",
+      "speaker": "Лиса",
+      "gender": "female",
+      "emotion": "whisper",
+      "text": "Ты слышишь? Кажется, рядом кто-то есть.",
+      "visual_query": "cartoon fox character close-up forest"
+    },
+    {
+      "id": "bunny1",
+      "speaker": "Зайка",
+      "gender": "child",
+      "emotion": "fear",
+      "text": "Мне страшно. Давай лучше спрячемся!",
+      "visual_query": "cartoon bunny character scared forest"
+    },
+    {
+      "id": "fox2",
+      "speaker": "Лиса",
+      "gender": "female",
+      "emotion": "joy",
+      "text": "Это же просто ветер! Смотри — как весело кружатся листья.",
+      "visual_query": "cartoon fox happy leaves falling"
+    },
+    {
+      "id": "n2",
+      "speaker": "narrator",
+      "emotion": "warm",
+      "text": "И друзья снова засмеялись — страхи растаяли в солнечном свете.",
+      "visual_query": "cartoon friends sunshine forest ending"
+    }
+  ]
+}

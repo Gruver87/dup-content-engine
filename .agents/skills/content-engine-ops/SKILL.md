@@ -7,7 +7,7 @@ license: MIT
 compatibility: Local laptop; sibling of dup-lab. Keys optional and late.
 metadata:
   author: dup-labs
-  version: "0.1.6"
+  version: "0.1.10"
   product: dup-content-engine
 ---
 
@@ -24,10 +24,18 @@ metadata:
 1. `python -m content_engine doctor`
 2. Plan: `python -m content_engine calendar topics.example.txt`
 3. Today: `python -m content_engine day topics.example.txt --out out/series`
+   - RU: `day topics.ru.example.txt --language ru`
    - or scripts only: add `--scripts-only`
+   - On ALLOW: auto `finish` → copy + ship zip (no auto-post)
+4b. Checklist: `python -m content_engine ready --out out/demo`
 4. Inspect `out/series/*/AB_REPORT.html` and `verified_pack_*.json`
-5. Export for manual upload: `python -m content_engine export <mp4> --pack <pack>`
-6. Keys later: `youtube` / `tiktok --mode inbox` / `instagram` with `--dry-run` first
+5. Copy + ship (no keys): `copy --pack …` then `bundle <mp4> --pack … --with-copy`
+6. Optional polish: `normalize <mp4>`; caption look in `configs/brand.toml` `[captions].style`
+7. Ops digest: `status`
+8. Queue: drop scripts in `inbox/` → `python -m content_engine inbox`
+9. Chapters paste: `chapters --script …` or `--srt …`
+10. Export for manual upload: `python -m content_engine export <mp4> --pack <pack>`
+11. Keys later: `youtube` / `tiktok --mode inbox` / `instagram` with `--dry-run` first
 
 ## Refuse
 

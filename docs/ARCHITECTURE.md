@@ -5,7 +5,7 @@
 1. **Runnable on a weak laptop** — CPU only, bundled FFmpeg via `imageio-ffmpeg`.
 2. **Fail-closed** — missing evidence or failed checks → REFUSE, not silent green.
 3. **Universal** — same pipeline for engineering explainers, product demos, niche A/B topics.
-4. **Honest publish path** — export folder for TikTok; optional YouTube API later; no cookie bots.
+4. **Honest publish path** — export / ship bundle for TikTok; optional official APIs later; no cookie bots.
 
 ## Package layout
 

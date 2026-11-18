@@ -44,6 +44,9 @@ bash scripts/test_me.sh --skip-series
 | Preview | `out/demo/preview.html` |
 | Calendar | `out/calendar/CALENDAR.md` |
 | A/B report | `out/series/*/AB_REPORT.html` |
+| Copy / ship / icon | `out/copy/`, `out/ship/`, `out/brand/icon_1024.png` |
+| Chapters / RU script | `out/chapters/`, `out/scripts/ru_demo.json` |
+| Inbox | `inbox/` + `inbox --dry-run` |
 
 В конце скрипт печатает **`TEST_ME_OK`**.
 

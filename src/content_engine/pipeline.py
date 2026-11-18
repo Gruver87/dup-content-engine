@@ -27,7 +27,12 @@ from content_engine.render import concat_audio, mux_final
 from content_engine.srt_builder import build_srt
 from content_engine.thumbnail import make_thumbnail
 from content_engine.visuals import AssetLicense, make_scene_clip
-from content_engine.voice import synthesize_scene, write_durations
+from content_engine.prosody import (
+    prosody_for,
+    resolve_character_voice,
+    spoken_and_caption,
+)
+from content_engine.voice import resolve_voice, synthesize_scene, write_durations
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_POLICY = PACKAGE_ROOT / "configs" / "policy.toml"
@@ -58,6 +63,9 @@ def run_pipeline(
 ) -> RunReport:
     policy = load_policy(policy_path or DEFAULT_POLICY)
     brand = load_brand(brand_path or DEFAULT_BRAND)
+    from content_engine.studio_kit import merge_studio_into_brand, polish_clip, mix_voice_with_sfx
+
+    brand, studio_cfg = merge_studio_into_brand(brand)
     media = policy.get("media") or {}
     voice_cfg = policy.get("voice") or {}
     vis = policy.get("visuals") or {}
@@ -93,16 +101,58 @@ def run_pipeline(
     hook = score_script(script)
     notes.append(f"hook_score={hook.get('score')} ({hook.get('label')})")
 
+    default_voice = resolve_voice(script.language, voice_cfg)
+    base_rate = str(voice_cfg.get("rate") or "+0%")
+    emotion_on = bool(voice_cfg.get("emotion", True))
+    tts_modes: list[str] = []
+    emotion_notes: list[str] = []
+    show_speaker = bool((brand.get("captions") or {}).get("speaker_labels", True))
     for scene in script.scenes:
-        audio = work / "audio" / f"{scene.id}.mp3"
-        dur = synthesize_scene(
+        spoken_txt, caption_txt = spoken_and_caption(
             scene.text,
+            speaker=scene.speaker,
+            show_speaker_in_caption=show_speaker,
+        )
+        # Burn/SRT read scene.text — keep captions aligned with spoken dialogue
+        scene.text = caption_txt
+
+        audio = work / "audio" / f"{scene.id}.mp3"
+        scene_voice, voice_reason = resolve_character_voice(
+            language=script.language,
+            voice_cfg=voice_cfg,
+            speaker=scene.speaker,
+            gender=scene.gender,
+            voice_override=scene.voice,
+            default_voice=default_voice,
+        )
+        pros = None
+        if emotion_on:
+            pros = prosody_for(
+                text=spoken_txt,
+                emotion=scene.emotion,
+                visual_query=scene.visual_query,
+                tags=script.tags,
+                base_rate=base_rate,
+            )
+            emotion_notes.append(
+                f"{scene.id}:{pros.emotion}/{pros.reason}"
+                f"@{scene_voice.split('-')[-1] if '-' in scene_voice else scene_voice}"
+            )
+        dur, tts_mode = synthesize_scene(
+            spoken_txt,
             audio,
-            voice=str(voice_cfg.get("voice") or "en-US-ChristopherNeural"),
-            rate=str(voice_cfg.get("rate") or "+0%"),
+            voice=scene_voice,
+            rate=base_rate if pros is None else pros.rate,
+            volume=pros.volume if pros else "+0%",
+            pitch=pros.pitch if pros else "+0Hz",
             allow_network=allow_network_tts,
             provider=tts_provider if allow_network_tts else "offline",
+            language=script.language,
+            prosody=pros,
         )
+        tts_modes.append(tts_mode)
+        if voice_reason != "narrator":
+            notes.append(f"voice[{scene.id}]={scene_voice} ({voice_reason})")
         clip = work / "clips" / f"{scene.id}.mp4"
         _, lic = make_scene_clip(
             clip,
@@ -131,19 +181,93 @@ def run_pipeline(
             for t in timings
         ],
     )
+    spoken = sum(1 for m in tts_modes if m != "offline")
+    notes.append(
+        f"tts_voice={default_voice} lang={script.language} "
+        f"spoken={spoken}/{len(tts_modes)} modes={','.join(sorted(set(tts_modes)))}"
+    )
+    if emotion_notes:
+        notes.append("prosody=" + ",".join(emotion_notes[:12]))
+    if spoken == 0 and timings:
+        notes.append(
+            "tts_warning=all_offline_tone — use network edge-tts (omit --offline-tts) for real speech"
+        )
     voice_full = work / "voice_full.mp3"
     concat_audio([Path(t.audio_path) for t in timings], voice_full)
 
     # Captions
+    from content_engine.caption_styles import merge_caption_style
+
+    cap_cfg = brand.get("captions") or {}
+    script_caps = {}
+    # Optional per-script overrides: script.json → "captions" / "visual_style"
+    raw_script = json.loads(script_path.read_text(encoding="utf-8"))
+    if isinstance(raw_script.get("captions"), dict):
+        script_caps = raw_script["captions"]
+    cap_style = merge_caption_style(
+        captions_cfg=cap_cfg,
+        script_meta=script_caps,
+        script_data=raw_script,
+    )
+    caption_style = str(cap_style.get("label") or "boxed")
     captions = build_ass(
-        script.scenes, timings, work / "captions.ass", width=width, height=height
+        script.scenes,
+        timings,
+        work / "captions.ass",
+        width=width,
+        height=height,
+        style_name=caption_style,
     )
     timings, cap_notes = caption_all_clips(
-        script.scenes, timings, work, width=width, height=height
+        script.scenes,
+        timings,
+        work,
+        width=width,
+        height=height,
+        style=cap_style,
+    )
+    notes.append(
+        f"caption_style={caption_style} placement={cap_style.get('placement')} "
+        f"({cap_style.get('placement_reason')}) y={cap_style.get('y_ratio')} "
+        f"box={cap_style.get('box')} color={cap_style.get('font_color')}"
     )
     notes.extend(cap_notes)
+    notes.append(
+        f"studio=template:{studio_cfg.get('template')} mood:{studio_cfg.get('music_mood')} "
+        f"grade:{studio_cfg.get('color_grade')} motion:{studio_cfg.get('motion')} "
+        f"sfx={studio_cfg.get('sfx')}"
+    )
 
-    # Watermark on captioned clips
+    # Studio polish: motion + color grade (CapCut/DaVinci-class, local ffmpeg)
+    polish_dir = work / "polished"
+    polish_dir.mkdir(parents=True, exist_ok=True)
+    polished: list[SceneTiming] = []
+    for t in timings:
+        if not t.clip_path or t.id == "endcard":
+            polished.append(t)
+            continue
+        dest = polish_dir / f"{t.id}.mp4"
+        _, pnotes = polish_clip(
+            Path(t.clip_path),
+            dest,
+            studio=studio_cfg,
+            duration_sec=t.duration_sec,
+            width=width,
+            height=height,
+            fps=fps,
+        )
+        notes.extend(f"polish[{t.id}]={n}" for n in pnotes)
+        polished.append(
+            SceneTiming(
+                id=t.id,
+                duration_sec=t.duration_sec,
+                audio_path=t.audio_path,
+                clip_path=str(dest),
+            )
+        )
+    timings = polished
+
+    # Watermark on polished clips
     if (brand.get("brand") or {}).get("watermark", True):
         wm_dir = work / "watermarked"
         wm_dir.mkdir(parents=True, exist_ok=True)
@@ -192,6 +316,18 @@ def run_pipeline(
     )
     notes.append(music_note)
 
+    # Soft whoosh SFX on scene joins (optional)
+    scene_durs = [t.duration_sec for t in timings if t.id != "endcard"]
+    sfx_out = work / "voice_sfx.mp3"
+    voice_mixed, sfx_note = mix_voice_with_sfx(
+        voice_mixed,
+        sfx_out,
+        scene_durations=scene_durs,
+        enabled=bool(studio_cfg.get("sfx")),
+        work_dir=work / "sfx",
+    )
+    notes.append(sfx_note)
+
     # Re-concat voice: mixed scenes + endcard silence if present
     if any(t.id == "endcard" for t in timings):
         # Rebuild full audio = mixed voice + silence
@@ -216,6 +352,19 @@ def run_pipeline(
     )
     if fade_sec > 0:
         notes.append(f"scene_fade={fade_sec}s")
+
+    # Optional loudnorm before gate (policy media.loudnorm = true)
+    if bool(media.get("loudnorm")):
+        from content_engine.loudnorm import normalize_mp4
+
+        ln_tmp = work / f"{run_id}.loudnorm.mp4"
+        ln = normalize_mp4(final_mp4, ln_tmp)
+        if ln.get("ok") and ln_tmp.is_file():
+            shutil.move(str(ln_tmp), str(final_mp4))
+            notes.append("loudnorm")
+        else:
+            notes.append(f"loudnorm_skip:{ln.get('error')}")
+
     shutil.copy2(captions, out_dir / f"{run_id}.ass")
     srt_path = build_srt(script.scenes, timings, out_dir / f"{run_id}.srt")
     notes.append(f"srt={srt_path.name}")

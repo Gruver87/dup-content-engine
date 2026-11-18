@@ -16,4 +16,37 @@ endcard_sec = 2.0
 # Soft bed under voice. Put a file in assets/music/ or leave enabled for generated bed.
 music_bed = true
 music_volume = 0.10
+# music_mood from [studio] or prefs: calm|warm|soft|tension|hype|off
 # music_file = "assets/music/bed.mp3"
+
+# Pro polish pack (CapCut/Descript/DaVinci-class via ffmpeg — not generative video AI)
+[studio]
+template = "social_default"   # social_default|cartoon_dialog|product_clean|dramatic|hype_hook
+music_mood = "warm"
+color_grade = "neutral"       # neutral|warm|cool|contrast|cinematic
+motion = "subtle"             # none|subtle|punch
+sfx = true                    # soft whoosh on scene joins
+
+[captions]
+# Presets: clean (только буквы) | boxed (тёмный фон) | bold | lower
+style = "boxed"
+# Куда ставить текст:
+#   auto  — сам: мульт/персонаж/аватар/лицо → ниже; абстракт → середина
+#   mid   — середина кадра
+#   lower — ниже (не перекрывает персонажей)
+placement = "auto"
+# Жёсткая позиция (если задана — важнее auto): 0.42 выше … 0.68 ниже
+# y_ratio = 0.62
+# box = false
+# font_color = "#FFFFFF"
+#
+# Имя персонажа в титрах: «Лиса: Ой!» (озвучка говорит только реплику)
+speaker_labels = true
+#
+# В script.json:
+#   "visual_style": "cartoon"
+#   "captions": { "placement": "lower", "style": "clean" }
+#   scene: "emotion": "joy"|"tension"|"whisper"…, "speaker": "Лиса", "gender": "female"
+#   или "lines": [{ "speaker", "text", "emotion" }, …] — по реплике = свой голос+титр
+#
+# Русский: --language ru  /  "language": "ru"

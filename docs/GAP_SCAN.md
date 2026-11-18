@@ -41,6 +41,22 @@ SRT + thumbnail · local calendar · multi-aspect reframe · stronger gate/verif
 
 `day`/`series` runner · A/B HTML report · jobs journal · scene fades · soft loudness check · ops skill
 
+## P5 — shipped in 0.1.7 (offline / keys-later)
+
+`copy` desk · `bundle` ship zip · `icon` 1024 brand tile
+
+## P6 — shipped in 0.1.8 (offline / keys-later)
+
+Caption style presets · loudnorm CLI · status digest · SHIP.html
+
+## P7 — shipped in 0.1.9 (offline / keys-later)
+
+RU offline scripts · YouTube `chapters` paste · local `inbox` queue
+
+## P8 — shipped in 0.1.10 (engine finish)
+
+RU voice auto · `ready`/`finish` · day/inbox ship kit on ALLOW · topics.ru
+
 ## Refuse (keep)
 
 Cookie bots · donor scrape · virality-as-guarantee · ALLOW-as-growth · trading auto-post as “content”

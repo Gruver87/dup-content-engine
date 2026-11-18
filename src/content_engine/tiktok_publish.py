@@ -51,13 +51,19 @@ def tiktok_publish(
     if mode not in {"inbox", "direct"}:
         return {"ok": False, "error": "mode must be inbox|direct"}
 
-    token = os.environ.get("TIKTOK_ACCESS_TOKEN")
+    from content_engine.env_file import load_dotenv
+    from content_engine.tiktok_auth import ensure_access_token, refresh_access_token
+
+    load_dotenv()
+    ensured = ensure_access_token()
+    token = ensured.get("access_token") if ensured.get("ok") else os.environ.get("TIKTOK_ACCESS_TOKEN")
     meta = {
         "platform": "tiktok",
         "mode": mode,
         "mp4": str(mp4),
         "bytes": mp4.stat().st_size,
         "caption": (caption or "")[:2200],
+        "token_refreshed": bool(ensured.get("refreshed")),
         "note": (
             "Official Content Posting API only. "
             "inbox=draft in creator app; direct requires video.publish + TikTok app audit. "
@@ -66,12 +72,17 @@ def tiktok_publish(
     }
 
     if dry_run:
+        missing = []
+        if not token:
+            missing.append("TIKTOK_ACCESS_TOKEN")
+            if not os.environ.get("TIKTOK_REFRESH_TOKEN"):
+                missing.append("TIKTOK_REFRESH_TOKEN")
         return {
             "ok": True,
             "dry_run": True,
             **meta,
             "env_ready": bool(token),
-            "missing_env": [] if token else ["TIKTOK_ACCESS_TOKEN"],
+            "missing_env": missing,
             "message": "dry_run OK — no TikTok API call",
         }
 
@@ -79,10 +90,11 @@ def tiktok_publish(
         return {
             "ok": False,
             "error": (
-                "TIKTOK_ACCESS_TOKEN missing. Register a TikTok developer app, "
-                "add Content Posting API, OAuth the creator, then retry. "
+                "TIKTOK_ACCESS_TOKEN missing (and refresh failed). "
+                "Run scripts/tiktok_oauth_helper.py or: dup-content tiktok-refresh. "
                 "Or: dup-content export … for manual upload."
             ),
+            "refresh": ensured if not ensured.get("ok") else None,
             **meta,
         }
 
@@ -130,20 +142,49 @@ def tiktok_publish(
             },
         }
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json; charset=UTF-8",
-    }
+    def _auth_headers(tok: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {tok}",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
+
+    def _needs_refresh(resp: Any) -> bool:
+        if getattr(resp, "status_code", 0) in {401, 403}:
+            return True
+        try:
+            err = ((resp.json() or {}).get("error") or {})
+            code = str(err.get("code") or "")
+            return code in {"access_token_invalid", "scope_not_authorized"}
+        except Exception:  # noqa: BLE001
+            return "access_token" in (getattr(resp, "text", "") or "").lower()
+
+    refresh_attempt: dict[str, Any] | None = None
     try:
         with httpx.Client(timeout=120.0) as client:
-            init = client.post(init_url, headers=headers, json=body)
-            if init.status_code >= 400:
+            init = client.post(init_url, headers=_auth_headers(str(token)), json=body)
+            if init.status_code >= 400 or _needs_refresh(init):
+                # One automatic refresh + retry (official refresh_token grant)
+                refresh_attempt = refresh_access_token(persist=True)
+                if refresh_attempt.get("ok"):
+                    token = os.environ.get("TIKTOK_ACCESS_TOKEN") or token
+                    meta["token_refreshed"] = True
+                    init = client.post(init_url, headers=_auth_headers(str(token)), json=body)
+                if init.status_code >= 400 or _needs_refresh(init):
+                    return {
+                        "ok": False,
+                        "error": f"init failed: {init.text[:600]}",
+                        "refresh_attempt": refresh_attempt,
+                        **meta,
+                    }
+            init_json = init.json() or {}
+            err_code = str(((init_json.get("error") or {}).get("code") or "ok"))
+            if err_code not in {"ok", ""}:
                 return {
                     "ok": False,
-                    "error": f"init failed: {init.text[:600]}",
+                    "error": f"init error: {err_code} {init.text[:500]}",
                     **meta,
                 }
-            data = (init.json() or {}).get("data") or {}
+            data = init_json.get("data") or {}
             upload_url = data.get("upload_url")
             publish_id = data.get("publish_id")
             if not upload_url:

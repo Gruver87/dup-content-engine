@@ -23,12 +23,15 @@ def run_series(
     limit: int = 1,
     variants: list[str] | None = None,
     pick: str = "best",
-    offline_tts: bool = True,
+    offline_tts: bool = False,
     scripts_only: bool = False,
+    language: str = "en",
+    finish: bool = True,
 ) -> dict[str, Any]:
     """
     pick=best → score A/B (or listed variants), render only the winner per topic
     pick=all  → render every variant
+    finish    → on ALLOW write copy+bundle+ready (no auto-post)
     """
     topics = load_topics(topics_path)[: max(0, limit)]
     variants = [v.upper() for v in (variants or ["A", "B"])]
@@ -41,10 +44,15 @@ def run_series(
 
     for topic in topics:
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", topic.lower()).strip("-")[:40] or "topic"
+        # Keep Cyrillic-friendly slug fallback
+        if not slug or slug == "topic":
+            slug = f"t{abs(hash(topic)) % 10_000_000}"
         tdir = root / slug
         tdir.mkdir(parents=True, exist_ok=True)
         base_path = tdir / "base_script.json"
-        script, _ = write_topic_script(topic, base_path, prefer_llm=False)
+        script, _ = write_topic_script(
+            topic, base_path, language=language, prefer_llm=False
+        )
 
         scored: list[tuple[str, Any, Path, dict[str, Any]]] = []
         for var in variants:
@@ -84,12 +92,23 @@ def run_series(
                         out_dir=sp.parent / "render",
                         allow_network_tts=not offline_tts,
                     )
+                    finish_info = None
+                    if finish and report.ok and report.output_mp4 and report.pack_path:
+                        from content_engine.finish_kit import finish_allow_run
+
+                        finish_info = finish_allow_run(
+                            Path(report.output_mp4),
+                            Path(report.pack_path),
+                            script_path=sp,
+                            ship_dir=root / "ship",
+                        )
                     row.update(
                         {
                             "ok": report.ok,
                             "output_mp4": report.output_mp4,
                             "pack_path": report.pack_path,
                             "detail": report.gate.detail,
+                            "finish": finish_info,
                         }
                     )
             ranked.append(row)
@@ -108,6 +127,7 @@ def run_series(
         "pick": pick,
         "count": len(ranked_sorted),
         "allow_count": sum(1 for r in ranked_sorted if r.get("ok")),
+        "language": language,
         "note": "Offline series runner. Hook heuristic ≠ virality. Keys not required.",
         "ranked": ranked_sorted,
     }

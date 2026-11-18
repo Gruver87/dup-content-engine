@@ -21,8 +21,10 @@ def build_ab_report(
         label = hook.get("label") if isinstance(hook, dict) else ""
         mp4 = r.get("output_mp4") or ""
         video = ""
-        if mp4 and Path(mp4).is_file():
-            video = f"<video controls src='{html.escape(Path(mp4).as_uri())}'></video>"
+        p = Path(mp4) if mp4 else None
+        if p and p.is_file():
+            # Windows often stores relative paths — resolve before file:// URI
+            video = f"<video controls src='{html.escape(p.resolve().as_uri())}'></video>"
         elif mp4:
             video = f"<code>{html.escape(str(mp4))}</code>"
         rows += (

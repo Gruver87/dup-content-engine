@@ -37,8 +37,14 @@ def load_topics(path: Path) -> list[str]:
     return topics
 
 
-def _ab_hooks(topic: str) -> dict[str, str]:
+def _ab_hooks(topic: str, *, language: str = "en") -> dict[str, str]:
     t = topic.strip().rstrip(".")
+    lang = (language or "en").lower().split("-")[0]
+    if lang == "ru":
+        return {
+            "A": f"Большинство ошибаются насчёт «{t}». Вот fail-closed версия за тридцать секунд.",
+            "B": f"Хватит верить тихому зелёному статусу. «{t}» без evidence — это REFUSE.",
+        }
     return {
         "A": f"Most people get {t} wrong. Here is the fail-closed version in under thirty seconds.",
         "B": f"Stop trusting silent green checks. {t} needs evidence — or you refuse.",
@@ -46,14 +52,14 @@ def _ab_hooks(topic: str) -> dict[str, str]:
 
 
 def apply_hook_variant(script: Script, variant: str, topic: str) -> Script:
-    hooks = _ab_hooks(topic)
+    hooks = _ab_hooks(topic, language=script.language)
     text = hooks.get(variant.upper(), hooks["A"])
     scenes = []
     for i, sc in enumerate(script.scenes):
+        row = sc.to_dict()
         if i == 0 or sc.id == "hook":
-            scenes.append({"id": sc.id, "text": text, "visual_query": sc.visual_query})
-        else:
-            scenes.append({"id": sc.id, "text": sc.text, "visual_query": sc.visual_query})
+            row["text"] = text
+        scenes.append(row)
     data = script.to_dict()
     data["scenes"] = scenes
     data["title"] = f"{script.title} [{variant.upper()}]"
