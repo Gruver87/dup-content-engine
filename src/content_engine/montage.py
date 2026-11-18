@@ -715,6 +715,56 @@ def apply_clip_speed(
     }
 
 
+def apply_clip_volume(
+    src: Path,
+    out: Path,
+    *,
+    volume: float = 1.0,
+    mute: bool = False,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Constant per-clip volume gain / mute (volume filter).
+
+    Honesty: not CapCut multi-keyframe audio envelopes / ducking / noise reduction.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    vol = 0.0 if mute else max(0.0, min(2.0, float(volume if volume is not None else 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or (abs(vol - 1.0) < 0.02 and not mute):
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "volume": vol,
+            "mute": bool(mute),
+            "skipped": True,
+        }
+    args: list[str] = ["-i", str(src), "-c:v", "copy"]
+    if mute or vol <= 0.001:
+        args += ["-an"]
+        vol = 0.0
+    else:
+        args += ["-af", f"volume={vol:.4f}", "-c:a", "aac", "-b:a", "128k"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "volume": vol,
+        "mute": bool(mute) or vol <= 0.001,
+        "honesty": (
+            "Clip volume = constant gain / mute. "
+            "Not CapCut audio keyframe envelopes / ducking."
+        ),
+    }
+
+
 def apply_clip_keyframes(
     src: Path,
     out: Path,
@@ -863,6 +913,18 @@ def render_timeline(
                 if do_rev:
                     tag += "+rev"
                 keyframe_notes.append(tag)
+        try:
+            volume = float(c.get("volume") if c.get("volume") is not None else 1.0)
+        except (TypeError, ValueError):
+            volume = 1.0
+        do_mute = bool(c.get("mute"))
+        if do_mute or abs(volume - 1.0) >= 0.02:
+            vol_out = work / f"vol_{i:03d}.mp4"
+            vr = apply_clip_volume(piece, vol_out, volume=volume, mute=do_mute, fps=fps)
+            if vr.get("ok") and not vr.get("skipped"):
+                piece = vol_out
+                vol_tag = "mute" if vr.get("mute") else f"{float(vr.get('volume', volume)):.2f}"
+                keyframe_notes.append(f"{c.get('name') or i}:vol={vol_tag}")
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
         zoom = float(c.get("zoom") or 1.0)

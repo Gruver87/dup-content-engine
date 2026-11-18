@@ -4,6 +4,7 @@ from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
     apply_clip_keyframes,
     apply_clip_speed,
+    apply_clip_volume,
     concat_clips,
     delete_media,
     image_to_clip,
@@ -119,6 +120,13 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     rr = apply_clip_speed(src, rev, speed=1.0, reverse=True, fps=12)
     assert rr["ok"] is True and rr.get("reverse") is True
     assert Path(rr["path"]).is_file()
+
+    muted = out / "mute.mp4"
+    mv = apply_clip_volume(src, muted, mute=True)
+    assert mv["ok"] is True and mv.get("mute") is True
+    quiet = out / "quiet.mp4"
+    qv = apply_clip_volume(src, quiet, volume=0.25)
+    assert qv["ok"] is True and abs(float(qv["volume"]) - 0.25) < 0.01
 
 
 def test_transitions_pack_and_fade(tmp_path, monkeypatch):

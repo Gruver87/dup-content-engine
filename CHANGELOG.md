@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.39 — 2026-11-18
+
+- Montage **volume / mute** per clip on stitch (constant gain) — not CapCut audio envelopes
+- Console Timeline: Volume + Mute
+
 ## 0.1.38 — 2026-11-18
 
 - Montage **reverse** clip flag on stitch (with speed) — not CapCut freeze/curve craft
