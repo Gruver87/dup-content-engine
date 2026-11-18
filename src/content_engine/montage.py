@@ -27,6 +27,70 @@ _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac"}
 
+# Local ffmpeg xfade pack — CapCut-ish joins, not Gen-video / Premiere Pro suite claim
+TRANSITIONS: dict[str, dict[str, Any]] = {
+    "cut": {"label": "Cut", "label_ru": "Резко", "xfade": None, "note": "hard join"},
+    "fade": {"label": "Fade", "label_ru": "Затухание", "xfade": "fade", "note": "black crossfade"},
+    "dissolve": {"label": "Dissolve", "label_ru": "Наплыв", "xfade": "dissolve", "note": "overlap blend"},
+    "wipeleft": {"label": "Wipe ←", "label_ru": "Шторка ←", "xfade": "wipeleft", "note": "wipe"},
+    "wiperight": {"label": "Wipe →", "label_ru": "Шторка →", "xfade": "wiperight", "note": "wipe"},
+    "slideleft": {"label": "Slide", "label_ru": "Сдвиг", "xfade": "slideleft", "note": "slide"},
+    "circleopen": {"label": "Circle", "label_ru": "Круг", "xfade": "circleopen", "note": "iris"},
+    "pixelize": {"label": "Pixelize", "label_ru": "Пиксели", "xfade": "pixelize", "note": "stylized"},
+}
+
+PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
+
+
+def list_transitions() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "transitions": {
+            k: {"label": v["label"], "label_ru": v["label_ru"], "note": v.get("note")}
+            for k, v in TRANSITIONS.items()
+        },
+        "default": "cut",
+        "honesty": (
+            "Transitions = ffmpeg xfade between timeline clips. "
+            "Not CapCut pro pack / Gen-video / AI morph."
+        ),
+    }
+
+
+def resolve_transition(name: str | None) -> str:
+    key = (name or "cut").strip().lower()
+    return key if key in TRANSITIONS else "cut"
+
+
+def load_montage_prefs() -> dict[str, Any]:
+    base = {"transition": "cut", "transition_sec": 0.35}
+    if PREFS_PATH.is_file():
+        try:
+            data = json.loads(PREFS_PATH.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                if data.get("transition") in TRANSITIONS:
+                    base["transition"] = str(data["transition"])
+                if "transition_sec" in data:
+                    base["transition_sec"] = float(data["transition_sec"])
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            pass
+    base["transition_sec"] = max(0.15, min(1.2, float(base["transition_sec"])))
+    return base
+
+
+def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
+    cur = load_montage_prefs()
+    if patch.get("transition") in TRANSITIONS:
+        cur["transition"] = str(patch["transition"])
+    if "transition_sec" in patch:
+        try:
+            cur["transition_sec"] = max(0.15, min(1.2, float(patch["transition_sec"])))
+        except (TypeError, ValueError):
+            pass
+    MONTAGE_OUT.mkdir(parents=True, exist_ok=True)
+    PREFS_PATH.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
+    return {"ok": True, "prefs": cur}
+
 
 def _ensure_dirs() -> None:
     LIBRARY.mkdir(parents=True, exist_ok=True)
@@ -286,6 +350,74 @@ def _norm_clip(
     return out
 
 
+def _xfade_join(
+    a: Path,
+    b: Path,
+    out: Path,
+    *,
+    xfade: str,
+    transition_sec: float,
+    dur_a: float,
+) -> float:
+    """Join two normalized clips with ffmpeg xfade + acrossfade. Returns out duration."""
+    tdur = max(0.15, min(1.2, transition_sec))
+    if dur_a <= tdur + 0.08:
+        # too short for xfade — hard append via concat demuxer
+        lst = out.with_suffix(".txt")
+        lst.write_text(
+            f"file '{a.resolve().as_posix()}'\nfile '{b.resolve().as_posix()}'\n",
+            encoding="utf-8",
+        )
+        run_ffmpeg(
+            [
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(lst),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                str(out),
+            ]
+        )
+        return float(media_duration_sec(out) or 0.0)
+    offset = max(0.0, dur_a - tdur)
+    run_ffmpeg(
+        [
+            "-i",
+            str(a),
+            "-i",
+            str(b),
+            "-filter_complex",
+            (
+                f"[0:v][1:v]xfade=transition={xfade}:duration={tdur:.3f}:offset={offset:.3f}[v];"
+                f"[0:a][1:a]acrossfade=d={tdur:.3f}[a]"
+            ),
+            "-map",
+            "[v]",
+            "-map",
+            "[a]",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(out),
+        ]
+    )
+    return float(media_duration_sec(out) or (dur_a + float(media_duration_sec(b) or 0.0) - tdur))
+
+
 def concat_clips(
     paths: list[Path],
     out: Path,
@@ -293,12 +425,20 @@ def concat_clips(
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
+    transition: str | None = None,
+    transition_sec: float | None = None,
 ) -> dict[str, Any]:
     if len(paths) < 1:
         return {"ok": False, "error": "need at least one clip"}
     missing = [str(p) for p in paths if not p.is_file()]
     if missing:
         return {"ok": False, "error": f"missing files: {missing[:3]}"}
+    prefs = load_montage_prefs()
+    tkey = resolve_transition(transition if transition is not None else prefs.get("transition"))
+    tdur = float(transition_sec if transition_sec is not None else prefs.get("transition_sec") or 0.35)
+    tdur = max(0.15, min(1.2, tdur))
+    xfade = TRANSITIONS[tkey].get("xfade")
+
     work = MONTAGE_OUT / "work" / uuid.uuid4().hex[:8]
     work.mkdir(parents=True, exist_ok=True)
     normalized: list[Path] = []
@@ -334,12 +474,39 @@ def concat_clips(
             normalized.append(n)
     if not normalized:
         return {"ok": False, "error": "no usable clips after normalize"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    if xfade and len(normalized) >= 2:
+        current = normalized[0]
+        cur_dur = float(media_duration_sec(current) or 0.0)
+        for i, nxt in enumerate(normalized[1:], start=1):
+            mid = work / f"xf_{i:03d}.mp4"
+            cur_dur = _xfade_join(
+                current,
+                nxt,
+                mid,
+                xfade=str(xfade),
+                transition_sec=tdur,
+                dur_a=cur_dur,
+            )
+            current = mid
+        shutil.copy2(current, out)
+        dur = media_duration_sec(out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "parts": len(normalized),
+            "duration_sec": round(dur, 3) if dur else None,
+            "transition": tkey,
+            "transition_sec": tdur,
+        }
+
     lst = work / "concat.txt"
     lst.write_text(
         "\n".join(f"file '{p.resolve().as_posix()}'" for p in normalized) + "\n",
         encoding="utf-8",
     )
-    out.parent.mkdir(parents=True, exist_ok=True)
     run_ffmpeg(
         [
             "-f",
@@ -381,6 +548,8 @@ def concat_clips(
         "rel": _rel(out),
         "parts": len(normalized),
         "duration_sec": round(dur, 3) if dur else None,
+        "transition": "cut",
+        "transition_sec": 0.0,
     }
 
 
@@ -393,13 +562,35 @@ def load_timeline() -> dict[str, Any]:
     return {"clips": [], "updated": None}
 
 
-def save_timeline(clips: list[dict[str, Any]]) -> dict[str, Any]:
+def save_timeline(
+    clips: list[dict[str, Any]],
+    *,
+    transition: str | None = None,
+    transition_sec: float | None = None,
+) -> dict[str, Any]:
     _ensure_dirs()
+    prev = load_timeline()
+    prefs = load_montage_prefs()
+    tkey = resolve_transition(
+        transition if transition is not None else prev.get("transition") or prefs.get("transition")
+    )
+    tsec = transition_sec
+    if tsec is None:
+        tsec = prev.get("transition_sec")
+    if tsec is None:
+        tsec = prefs.get("transition_sec")
+    try:
+        tsec_f = max(0.15, min(1.2, float(tsec)))
+    except (TypeError, ValueError):
+        tsec_f = 0.35
     data = {
         "clips": clips,
+        "transition": tkey,
+        "transition_sec": tsec_f,
         "updated": datetime.now(timezone.utc).isoformat(),
     }
     TIMELINE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    save_montage_prefs({"transition": tkey, "transition_sec": tsec_f})
     return {"ok": True, "timeline": data, "saved": True, "count": len(clips)}
 
 
@@ -450,22 +641,108 @@ def delete_media(path_or_rel: str) -> dict[str, Any]:
     return {"ok": True, "deleted": name, "rel": rel}
 
 
+def apply_clip_keyframes(
+    src: Path,
+    out: Path,
+    *,
+    fade_in: float = 0.0,
+    fade_out: float = 0.0,
+    zoom: float = 1.0,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Basic per-clip keyframes: edge fades + optional Ken Burns zoom.
+
+    Honesty: not CapCut multi-track bezier keyframes / motion tracking.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    dur = float(media_duration_sec(src) or 0.0)
+    if dur < 0.2:
+        return {"ok": False, "error": "clip too short for keyframes"}
+    fin = max(0.0, min(float(fade_in or 0.0), dur / 3))
+    fout = max(0.0, min(float(fade_out or 0.0), dur / 3))
+    z = max(1.0, min(1.25, float(zoom or 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    filters: list[str] = []
+    if width and height:
+        # static zoom crop (reliable) — CapCut-ish punch-in, not bezier motion
+        zw, zh = int(width * z), int(height * z)
+        filters.append(
+            f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height}"
+        )
+    elif z > 1.001:
+        filters.append(f"scale=iw*{z:.3f}:ih*{z:.3f}")
+
+    fade_parts: list[str] = []
+    if fin > 0.04:
+        fade_parts.append(f"fade=t=in:st=0:d={fin:.3f}")
+    if fout > 0.04:
+        fade_parts.append(f"fade=t=out:st={max(0.0, dur - fout):.3f}:d={fout:.3f}")
+    if fade_parts:
+        filters.extend(fade_parts)
+
+    vf = ",".join(filters) if filters else "null"
+    args = ["-i", str(src), "-vf", vf, "-r", str(fps)]
+    args += [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        str(out),
+    ]
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "fade_in": fin,
+        "fade_out": fout,
+        "zoom": z,
+        "honesty": (
+            "Basic clip keyframes = fade in/out + optional zoom. "
+            "Not CapCut multi-track / bezier graph editor."
+        ),
+    }
+
+
 def render_timeline(
     *,
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
+    transition: str | None = None,
+    transition_sec: float | None = None,
 ) -> dict[str, Any]:
-    """Render timeline.json → out/montage/edit.mp4 (trim each then concat)."""
+    """Render timeline.json → out/montage/edit.mp4 (trim, keyframes, concat/xfade)."""
     tl = load_timeline()
     clips = tl.get("clips") or []
     if not clips:
         return {"ok": False, "error": "timeline empty — add clips first"}
+    prefs = load_montage_prefs()
+    tkey = resolve_transition(
+        transition if transition is not None else tl.get("transition") or prefs.get("transition")
+    )
+    tsec = transition_sec
+    if tsec is None:
+        tsec = tl.get("transition_sec")
+    if tsec is None:
+        tsec = prefs.get("transition_sec")
     work = MONTAGE_OUT / "timeline_work"
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
     parts: list[Path] = []
+    keyframe_notes: list[str] = []
     for i, c in enumerate(clips):
         src = Path(str(c.get("path") or ""))
         if not src.is_file():
@@ -498,15 +775,44 @@ def render_timeline(
                 width=width,
                 height=height,
             )
+        fade_in = float(c.get("fade_in") or 0.0)
+        fade_out = float(c.get("fade_out") or 0.0)
+        zoom = float(c.get("zoom") or 1.0)
+        if fade_in > 0.04 or fade_out > 0.04 or zoom > 1.001:
+            keyed = work / f"kf_{i:03d}.mp4"
+            kf = apply_clip_keyframes(
+                piece,
+                keyed,
+                fade_in=fade_in,
+                fade_out=fade_out,
+                zoom=zoom,
+                width=width,
+                height=height,
+                fps=fps,
+            )
+            if kf.get("ok"):
+                piece = keyed
+                keyframe_notes.append(
+                    f"{c.get('name') or i}:fi={fade_in:.2f}/fo={fade_out:.2f}/z={zoom:.2f}"
+                )
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
-    result = concat_clips(parts, out, width=width, height=height, fps=fps)
+    result = concat_clips(
+        parts,
+        out,
+        width=width,
+        height=height,
+        fps=fps,
+        transition=tkey,
+        transition_sec=float(tsec) if tsec is not None else None,
+    )
     if result.get("ok"):
         latest = MONTAGE_OUT / "edit_latest.mp4"
         shutil.copy2(out, latest)
         result["latest"] = str(latest)
         result["latest_rel"] = _rel(latest)
+        result["keyframes"] = keyframe_notes
     return result
 
 
@@ -517,14 +823,19 @@ def save_project(
 ) -> dict[str, Any]:
     """CapCut-style project save: timeline + meta to out/montage/project.json."""
     _ensure_dirs()
+    meta = meta or {}
     if clips is not None:
-        save_timeline(clips)
+        save_timeline(
+            clips,
+            transition=str(meta["transition"]) if meta.get("transition") else None,
+            transition_sec=float(meta["transition_sec"]) if meta.get("transition_sec") is not None else None,
+        )
     tl = load_timeline()
     payload = {
         "schema": "dup.montage_project.v1",
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "timeline": tl,
-        "meta": meta or {},
+        "meta": meta,
         "latest_edit": str(MONTAGE_OUT / "edit_latest.mp4"),
         "honesty": "Local project file — not cloud sync, not a growth claim.",
     }

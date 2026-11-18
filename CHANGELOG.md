@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.1.34 — 2026-11-18
+
+- Montage **basic keyframes**: per-clip fade in/out + zoom punch-in on stitch
+- Console Timeline: Apply KF to selected clip (not CapCut multi-track bezier)
+
+## 0.1.33 — 2026-11-18
+
+- Studio **text-edit cut**: keep/drop scenes by dialogue (`/api/cut`) — not Descript word-level
+- Inbox **local approve gate**: `inbox/approved/<stem>.ok` before process (Telegram-style, not Bot API)
+- Console: Cut desk + Require approve / Approve selected
+
+## 0.1.32 — 2026-11-18
+
+- **Multi-schedule**: local `SCHEDULE.json` across tiktok/youtube/instagram (plan only, not auto-post)
+- Console Publish: build/reload schedule + open `out/calendar/`; overview local calendar chip
+- Keys UI: YouTube secrets/token + Instagram presence (booleans only, never secret values)
+- CLI `calendar --schedule --platforms tiktok,youtube,instagram`
+
+## 0.1.31 — 2026-11-18
+
+- Library **collections**: local named lists (`out/console/collections.json`) — not Opus cloud
+- Library **thumbnails grid** + ensure-thumb action; overview recent thumbs show JPG when present
+- `/api/collections` create/add/remove; snapshot library includes collections
+
+## 0.1.30 — 2026-11-18
+
+- **Hook/CTA packs**: offline templates (curiosity / refuse / howto / list / tension / soft_cta)
+- Console Studio → Ideas pack picker; CLI `hook-packs`; `/api/hook-packs`
+- Apply pack → rewrite first/last script beats (not a virality claim)
+- Hook score lexicon: basic RU tokens
+
+## 0.1.29 — 2026-11-18
+
+- Montage **transitions pack**: cut / fade / dissolve / wipe / slide / circle / pixelize (ffmpeg xfade)
+- Console timeline picker + duration; prefs in `out/montage/montage_prefs.json`
+- Stitch / project save pass `transition` into render
+
+## 0.1.28 — 2026-11-18
+
+- **Talking clip**: lip-animate mp4 + optional TTS mux (`character-preview --talk`, console button, `/api/characters` `talking_clip`)
+- Cast reel uses mouth frames (not still plates) before audio mux
+- Plate preview respects layout prefs (pip/full)
+
+## 0.1.27 — 2026-11-18
+
+- Character clips: **lip-animate** rule-based mouth frames from dialogue visemes (not ARKit)
+- Console prefs: **layout** pip/full + **lip_animate** toggle; prefs feed pipeline render
+- `make_scene_clip` passes `dialogue_text` into character kit
+
+## 0.1.26 — 2026-11-18
+
+- Character **PIP layout**: bust over query-colored bed (CapCut-ish), `brand.toml` `layout=pip|full`
+- Library lists character mp4s; open **cast sheet** / `characters/` from console
+- Snapshot includes `characters` artifact index
+
 ## 0.1.25 — 2026-11-18
 
 - **Cast reel**: roster plates + short TTS lines → `cast_reel.mp4` + `CAST_SHEET.html`

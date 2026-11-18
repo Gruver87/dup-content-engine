@@ -263,6 +263,43 @@ def viseme_open_amount(viseme: str) -> float:
     return float(table.get(viseme, 0.3))
 
 
+# Pillow mouth shapes for lip-animate mp4 frames (coarse — not ARKit)
+_VISEME_TO_MOUTH: dict[str, str] = {
+    "sil": "line",
+    "PP": "small",
+    "FF": "small",
+    "TH": "small",
+    "DD": "line",
+    "kk": "o",
+    "CH": "smile",
+    "SS": "small",
+    "nn": "line",
+    "RR": "line",
+    "aa": "o",
+    "E": "smile",
+    "ih": "smile",
+    "oh": "o",
+    "ou": "o",
+}
+
+
+def viseme_to_mouth(viseme: str) -> str:
+    """Map rule-based viseme id → Pillow mouth shape for plate frames."""
+    return _VISEME_TO_MOUTH.get((viseme or "sil").strip(), "line")
+
+
+def _mouth_at_ms(visemes: list[dict[str, Any]], t_ms: int) -> str:
+    if not visemes:
+        return "line"
+    cur = visemes[0]
+    for v in visemes:
+        if int(v.get("t_ms", 0)) <= t_ms:
+            cur = v
+        else:
+            break
+    return viseme_to_mouth(str(cur.get("viseme") or "sil"))
+
+
 # Candidate morph target names (Oculus visemes + common ARKit) — first match wins per role
 _MORPH_CANDIDATES: dict[str, list[str]] = {
     "sil": ["viseme_sil", "mouthClose", "Mouth_Close"],
@@ -397,11 +434,14 @@ def default_prefs() -> dict[str, Any]:
         "default_style": "cartoon",
         "enabled": True,
         "selected_glb": None,
+        "layout": "pip",
+        "lip_animate": True,
         "honesty": (
             "Local Character Kit = Pillow plates + procedural 3D preview. "
             "Not HeyGen Avatar V / Synthesia / SadTalker GPU. "
             "Optional cloud: avatar.py + HEYGEN_API_KEY. "
-            "GLB: drop Mixamo-compatible .glb into assets/avatars/ for Three.js preview."
+            "GLB: drop Mixamo-compatible .glb into assets/avatars/ for Three.js preview. "
+            "lip_animate = rule-based mouth frames in mp4 — not ARKit accuracy."
         ),
     }
 
@@ -418,6 +458,10 @@ def load_prefs() -> dict[str, Any]:
                     base["enabled"] = bool(data["enabled"])
                 if data.get("selected_glb"):
                     base["selected_glb"] = str(data["selected_glb"])
+                if data.get("layout") in {"pip", "full"}:
+                    base["layout"] = str(data["layout"])
+                if "lip_animate" in data:
+                    base["lip_animate"] = bool(data["lip_animate"])
         except (OSError, json.JSONDecodeError):
             pass
     # drop stale glb selection
@@ -434,6 +478,10 @@ def save_prefs(patch: dict[str, Any]) -> dict[str, Any]:
         cur["default_style"] = str(patch["default_style"])
     if "enabled" in patch:
         cur["enabled"] = bool(patch["enabled"])
+    if patch.get("layout") in {"pip", "full"}:
+        cur["layout"] = str(patch["layout"])
+    if "lip_animate" in patch:
+        cur["lip_animate"] = bool(patch["lip_animate"])
     if "selected_glb" in patch:
         rel = patch.get("selected_glb")
         if rel in (None, "", "none", "procedural"):
@@ -529,6 +577,24 @@ def _speaker_palette(speaker: str | None) -> tuple[tuple[int, int, int], tuple[i
     return hair, shirt
 
 
+def _bg_rgb_from_query(visual_query: str | None, speaker: str | None, style: str) -> tuple[int, int, int]:
+    if visual_query:
+        try:
+            from content_engine.visuals import _color_for
+
+            hx = _color_for(visual_query).replace("0x", "").replace("#", "")
+            if len(hx) >= 6:
+                return int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+        except Exception:  # noqa: BLE001
+            pass
+    digest = hashlib.sha256(f"{speaker}-{style}".encode()).hexdigest()
+    return (
+        20 + (int(digest[0:2], 16) % 40),
+        24 + (int(digest[2:4], 16) % 50),
+        40 + (int(digest[4:6], 16) % 80),
+    )
+
+
 def render_character_plate(
     out_png: Path,
     *,
@@ -538,26 +604,49 @@ def render_character_plate(
     speaker: str | None = None,
     emotion: str | None = None,
     gender: str | None = None,
+    visual_query: str | None = None,
+    layout: str = "full",
+    mouth_override: str | None = None,
 ) -> Path:
-    """Draw a stylized bust plate (Pillow). Not photoreal."""
+    """Draw a stylized bust plate (Pillow). Not photoreal.
+
+    layout:
+      full — character-centric plate
+      pip  — CapCut-ish bust over query-colored bed (lower third)
+    mouth_override: smile|frown|o|small|line — lip-animate frames (not ARKit).
+    """
     from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
     key = resolve_style(scene_style=style)
     meta = STYLES[key]
     out_png.parent.mkdir(parents=True, exist_ok=True)
+    layout = (layout or "full").lower()
+    if layout not in {"full", "pip"}:
+        layout = "full"
 
-    # Background gradient-ish solid
-    digest = hashlib.sha256(f"{speaker}-{key}".encode()).hexdigest()
-    bg = (
-        20 + (int(digest[0:2], 16) % 40),
-        24 + (int(digest[2:4], 16) % 50),
-        40 + (int(digest[4:6], 16) % 80),
-    )
+    bg = _bg_rgb_from_query(visual_query, speaker, key)
     img = Image.new("RGB", (width, height), bg)
     draw = ImageDraw.Draw(img)
 
-    cx, cy = width // 2, int(height * 0.42)
-    face_r = int(min(width, height) * (0.22 if key != "mascot" else 0.26))
+    # soft vignette / atmosphere for pip beds
+    if layout == "pip":
+        overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        for i in range(6):
+            a = 18 + i * 10
+            od.ellipse(
+                [-width // 4, -height // 5 + i * 40, width + width // 4, height // 2 + i * 60],
+                fill=(0, 0, 0, a),
+            )
+        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+    if layout == "pip":
+        cx, cy = width // 2, int(height * 0.58)
+        face_r = int(min(width, height) * (0.26 if key != "mascot" else 0.30))
+    else:
+        cx, cy = width // 2, int(height * 0.42)
+        face_r = int(min(width, height) * (0.22 if key != "mascot" else 0.26))
     hair, shirt = _speaker_palette(speaker)
     skin = tuple(meta["skin"])
     outline = tuple(meta["outline"])
@@ -609,9 +698,9 @@ def render_character_plate(
         draw.ellipse([ex - iris_r, ey - iris_r, ex + iris_r, ey + iris_r], fill=iris)
         draw.ellipse([ex - iris_r // 3, ey - iris_r // 2, ex + iris_r // 4, ey], fill=(255, 255, 255))
 
-    # brows / cheeks / mouth by emotion
+    # brows / cheeks / mouth by emotion (mouth_override for lip-animate frames)
     emo = (emotion or "neutral").strip().lower()
-    mouth = _EMOTION_MOUTH.get(emo, "line")
+    mouth = mouth_override or _EMOTION_MOUTH.get(emo, "line")
     if meta.get("cheek"):
         cr = int(face_r * 0.12)
         for side in (-1, 1):
@@ -678,59 +767,188 @@ def make_character_clip(
     emotion: str | None = None,
     gender: str | None = None,
     visual_query: str = "character",
+    layout: str | None = None,
+    text: str | None = None,
+    lip_animate: bool | None = None,
 ) -> tuple[Path, AssetLicense]:
-    """PNG plate → short H.264 clip for the pipeline."""
+    """PNG plate → short H.264 clip for the pipeline (default PIP over query bed).
+
+    When ``text`` + ``lip_animate``, render a short mouth-shape frame sequence from
+    rule-based visemes (not ARKit / HeyGen lip accuracy).
+    """
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     plate = out_mp4.with_suffix(".png")
     key = resolve_style(scene_style=style)
-    render_character_plate(
-        plate,
-        width=width,
-        height=height,
-        style=key,
-        speaker=speaker,
-        emotion=emotion,
-        gender=gender,
-    )
+    prefs = load_prefs()
+    layout_key = (layout or prefs.get("layout") or "pip").lower()
+    if layout_key not in {"full", "pip"}:
+        layout_key = "pip"
+    do_lips = bool(prefs.get("lip_animate", True) if lip_animate is None else lip_animate)
+    dialogue = (text or "").strip()
+    use_lips = do_lips and bool(dialogue)
+
     dur = max(0.5, duration_sec)
     fade_out = max(0.0, dur - 0.28)
-    # subtle Ken Burns on plate
-    zoom = 1.06
-    run_ffmpeg(
-        [
-            "-loop",
-            "1",
-            "-i",
-            str(plate),
-            "-t",
-            f"{dur:.3f}",
-            "-vf",
-            (
-                f"scale={int(width * zoom)}:{int(height * zoom)},"
-                f"crop={width}:{height},"
-                f"fade=t=in:st=0:d=0.2,"
-                f"fade=t=out:st={fade_out:.3f}:d=0.28"
-            ),
-            "-r",
-            str(fps),
-            "-an",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            str(out_mp4),
-        ]
-    )
+    anim_tag = "still"
+
+    if use_lips:
+        visemes = text_to_visemes(dialogue)
+        frames_dir = out_mp4.parent / f"{out_mp4.stem}_frames"
+        frames_dir.mkdir(parents=True, exist_ok=True)
+        anim_fps = 8
+        n_frames = max(2, min(40, int(dur * anim_fps)))
+        frame_paths: list[Path] = []
+        last_mouth: str | None = None
+        last_path: Path | None = None
+        for i in range(n_frames):
+            t_ms = int((i / max(n_frames, 1)) * dur * 1000)
+            mouth = _mouth_at_ms(visemes, t_ms)
+            if mouth == last_mouth and last_path is not None:
+                frame_paths.append(last_path)
+                continue
+            fp = frames_dir / f"f_{i:03d}.png"
+            render_character_plate(
+                fp,
+                width=width,
+                height=height,
+                style=key,
+                speaker=speaker,
+                emotion=emotion,
+                gender=gender,
+                visual_query=visual_query,
+                layout=layout_key,
+                mouth_override=mouth,
+            )
+            frame_paths.append(fp)
+            last_mouth = mouth
+            last_path = fp
+        # representative still (mid open-ish)
+        mid = frame_paths[min(len(frame_paths) // 2, len(frame_paths) - 1)]
+        plate.write_bytes(mid.read_bytes())
+        # concat demuxer with equal slice durations
+        slice_dur = dur / max(len(frame_paths), 1)
+        lst = frames_dir / "concat.txt"
+        lines: list[str] = []
+        for fp in frame_paths:
+            lines.append(f"file '{fp.resolve().as_posix()}'")
+            lines.append(f"duration {slice_dur:.4f}")
+        lines.append(f"file '{frame_paths[-1].resolve().as_posix()}'")
+        lst.write_text("\n".join(lines), encoding="utf-8")
+        run_ffmpeg(
+            [
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(lst),
+                "-t",
+                f"{dur:.3f}",
+                "-vf",
+                (
+                    f"fade=t=in:st=0:d=0.15,"
+                    f"fade=t=out:st={fade_out:.3f}:d=0.25,"
+                    f"fps={fps}"
+                ),
+                "-an",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                str(out_mp4),
+            ]
+        )
+        anim_tag = f"lips:{len({p.name for p in frame_paths})}shapes"
+    else:
+        render_character_plate(
+            plate,
+            width=width,
+            height=height,
+            style=key,
+            speaker=speaker,
+            emotion=emotion,
+            gender=gender,
+            visual_query=visual_query,
+            layout=layout_key,
+        )
+        # subtle Ken Burns on plate
+        zoom = 1.05 if layout_key == "pip" else 1.06
+        run_ffmpeg(
+            [
+                "-loop",
+                "1",
+                "-i",
+                str(plate),
+                "-t",
+                f"{dur:.3f}",
+                "-vf",
+                (
+                    f"scale={int(width * zoom)}:{int(height * zoom)},"
+                    f"crop={width}:{height},"
+                    f"fade=t=in:st=0:d=0.2,"
+                    f"fade=t=out:st={fade_out:.3f}:d=0.28"
+                ),
+                "-r",
+                str(fps),
+                "-an",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                str(out_mp4),
+            ]
+        )
+
     lic = AssetLicense(
         provider="character_kit",
-        query=f"{visual_query}|{key}|{speaker or 'narrator'}",
+        query=f"{visual_query}|{key}|{speaker or 'narrator'}|{layout_key}|{anim_tag}",
         license="generated-in-pipeline",
-        attribution=f"DUP Character Kit ({key}) — stylized plate, not photoreal DiT",
+        attribution=(
+            f"DUP Character Kit ({key}/{layout_key}/{anim_tag}) — "
+            "stylized plate, not photoreal DiT / ARKit lips"
+        ),
         local_path=str(plate),
     )
     return out_mp4, lic
+
+
+def list_character_artifacts(*, limit: int = 20) -> dict[str, Any]:
+    """Local character outputs under out/characters/ (plates, reel, sheet)."""
+    root = PACKAGE_ROOT / "out" / "characters"
+    root.mkdir(parents=True, exist_ok=True)
+    mp4s: list[dict[str, Any]] = []
+    pngs: list[dict[str, Any]] = []
+    if root.is_dir():
+        for p in sorted(root.rglob("*.mp4"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
+            mp4s.append(
+                {
+                    "name": p.name,
+                    "rel": str(p.relative_to(PACKAGE_ROOT)).replace("\\", "/"),
+                    "size": p.stat().st_size,
+                }
+            )
+        for p in sorted(root.rglob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
+            pngs.append(
+                {
+                    "name": p.name,
+                    "rel": str(p.relative_to(PACKAGE_ROOT)).replace("\\", "/"),
+                    "size": p.stat().st_size,
+                }
+            )
+    sheet = root / "cast" / "CAST_SHEET.html"
+    return {
+        "ok": True,
+        "dir": str(root),
+        "mp4s": mp4s,
+        "pngs": pngs,
+        "sheet_rel": (
+            str(sheet.relative_to(PACKAGE_ROOT)).replace("\\", "/") if sheet.is_file() else None
+        ),
+    }
 
 
 def preview_plate(
@@ -741,11 +959,16 @@ def preview_plate(
     width: int = 540,
     height: int = 960,
     out_dir: Path | None = None,
+    layout: str | None = None,
 ) -> dict[str, Any]:
     """Write one character plate PNG under out/ for CLI / console."""
     dest_dir = out_dir or (PACKAGE_ROOT / "out" / "characters")
     dest_dir.mkdir(parents=True, exist_ok=True)
     key = resolve_style(scene_style=style, speaker=speaker)
+    prefs = load_prefs()
+    layout_key = (layout or prefs.get("layout") or "pip").lower()
+    if layout_key not in {"full", "pip"}:
+        layout_key = "pip"
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (speaker or "narrator"))[:32]
     out = dest_dir / f"plate_{key}_{safe}.png"
     render_character_plate(
@@ -755,13 +978,131 @@ def preview_plate(
         style=key,
         speaker=speaker,
         emotion=emotion,
+        layout=layout_key,
     )
     return {
         "ok": True,
         "style": key,
+        "layout": layout_key,
         "path": str(out),
         "rel": _rel_or_abs(out),
         "honesty": "Stylized Pillow plate — not photoreal DiT",
+    }
+
+
+def preview_talking_clip(
+    *,
+    text: str,
+    style: str = "cartoon",
+    speaker: str | None = "Hero",
+    emotion: str | None = "neutral",
+    gender: str | None = None,
+    width: int = 540,
+    height: int = 960,
+    fps: int = 24,
+    layout: str | None = None,
+    language: str = "ru",
+    out_dir: Path | None = None,
+    allow_network_tts: bool = False,
+    with_audio: bool = True,
+) -> dict[str, Any]:
+    """Lip-animate character mp4 (+ optional offline TTS mux). Not ARKit / HeyGen."""
+    from content_engine.prosody import resolve_character_voice
+    from content_engine.voice import resolve_voice, synthesize_scene
+
+    line = (text or "").strip()
+    if not line:
+        return {"ok": False, "error": "text required for talking clip"}
+
+    dest_dir = out_dir or (PACKAGE_ROOT / "out" / "characters")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    key = resolve_style(scene_style=style, speaker=speaker)
+    prefs = load_prefs()
+    layout_key = (layout or prefs.get("layout") or "pip").lower()
+    if layout_key not in {"full", "pip"}:
+        layout_key = "pip"
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (speaker or "narrator"))[:32]
+    stem = f"talk_{key}_{safe}"
+    silent = dest_dir / f"{stem}_silent.mp4"
+    out_mp4 = dest_dir / f"{stem}.mp4"
+    audio = dest_dir / f"{stem}.mp3"
+
+    dur = max(1.0, min(12.0, 0.08 * len(line) + 0.6))
+    tts_mode = "none"
+    if with_audio:
+        lang = (language or "ru").lower()
+        voice_cfg: dict[str, Any] = {}
+        default_voice = resolve_voice(lang, voice_cfg)
+        scene_voice, _reason = resolve_character_voice(
+            language=lang,
+            voice_cfg=voice_cfg,
+            speaker=speaker,
+            gender=gender,
+            voice_override=None,
+            default_voice=default_voice,
+        )
+        dur, tts_mode = synthesize_scene(
+            line,
+            audio,
+            voice=scene_voice,
+            rate="+0%",
+            allow_network=allow_network_tts,
+            provider=None if allow_network_tts else "offline",
+            language=lang,
+        )
+        dur = max(1.0, float(dur) + 0.2)
+
+    make_character_clip(
+        silent,
+        duration_sec=dur,
+        width=width,
+        height=height,
+        fps=fps,
+        style=key,
+        speaker=speaker,
+        emotion=emotion,
+        gender=gender,
+        visual_query=f"talking {speaker or 'character'}",
+        layout=layout_key,
+        text=line,
+        lip_animate=True,
+    )
+
+    if with_audio and audio.is_file():
+        run_ffmpeg(
+            [
+                "-i",
+                str(silent),
+                "-i",
+                str(audio),
+                "-t",
+                f"{dur:.3f}",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(out_mp4),
+            ]
+        )
+    else:
+        if out_mp4.exists():
+            out_mp4.unlink()
+        silent.replace(out_mp4)
+
+    return {
+        "ok": out_mp4.is_file(),
+        "style": key,
+        "layout": layout_key,
+        "path": str(out_mp4),
+        "rel": _rel_or_abs(out_mp4),
+        "duration_sec": round(dur, 3),
+        "tts_mode": tts_mode,
+        "text": line[:200],
+        "honesty": (
+            "Talking clip = rule-based mouth frames + optional TTS mux. "
+            "Not ARKit / TalkingHead / HeyGen lip accuracy."
+        ),
     }
 
 
@@ -914,39 +1255,46 @@ def build_cast_reel(
             language=lang,
         )
         notes.append(f"{rid}:{mode}:{reason}")
-        # still plate → video with audio
-        clip = work / f"{rid}.mp4"
-        png = Path(str(plate["path"]))
         dur = max(1.2, float(dur) + 0.25)
+        silent = work / f"{rid}_silent.mp4"
+        make_character_clip(
+            silent,
+            duration_sec=dur,
+            width=width,
+            height=height,
+            fps=fps,
+            style=style,
+            speaker=speaker,
+            emotion=emotion,
+            gender=gender if isinstance(gender, str) else None,
+            visual_query=f"cast {speaker}",
+            layout="pip",
+            text=line,
+            lip_animate=True,
+        )
+        clip = work / f"{rid}.mp4"
         run_ffmpeg(
             [
-                "-loop",
-                "1",
                 "-i",
-                str(png),
+                str(silent),
                 "-i",
                 str(audio),
                 "-t",
                 f"{dur:.3f}",
-                "-vf",
-                f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height},fps={fps}",
                 "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
+                "copy",
                 "-c:a",
                 "aac",
                 "-shortest",
-                "-y",
                 str(clip),
             ]
         )
         parts.append(clip)
 
     out_mp4 = dest / "cast_reel.mp4"
-    concat = concat_clips(parts, out_mp4, width=width, height=height, fps=fps)
+    concat = concat_clips(
+        parts, out_mp4, width=width, height=height, fps=fps, transition="cut"
+    )
     return {
         "ok": bool(concat.get("ok", True)) and out_mp4.is_file(),
         "mp4": str(out_mp4),
@@ -955,8 +1303,8 @@ def build_cast_reel(
         "plates": cast,
         "notes": notes,
         "honesty": (
-            "Cast reel = local stylized plates + TTS (offline tone if no network). "
-            "Not HeyGen Avatar V / photoreal DiT."
+            "Cast reel = lip-animate Pillow plates + TTS (offline tone if no network). "
+            "Not HeyGen Avatar V / photoreal DiT / ARKit lips."
         ),
     }
 

@@ -57,6 +57,36 @@ def test_render_plate_png(tmp_path: Path):
     assert out.stat().st_size > 1000
 
 
+def test_pip_plate_and_clip(tmp_path: Path):
+    out = tmp_path / "pip.png"
+    render_character_plate(
+        out,
+        width=320,
+        height=568,
+        style="mascot",
+        speaker="Лиса",
+        emotion="joy",
+        visual_query="cartoon forest soft light",
+        layout="pip",
+    )
+    assert out.is_file()
+    mp4 = tmp_path / "pip.mp4"
+    path, lic = make_character_clip(
+        mp4,
+        duration_sec=0.5,
+        width=320,
+        height=568,
+        fps=12,
+        style="anime",
+        speaker="Зайка",
+        emotion="fear",
+        visual_query="forest",
+        layout="pip",
+    )
+    assert path.is_file()
+    assert "pip" in (lic.query or "")
+
+
 def test_make_character_clip(tmp_path: Path):
     out = tmp_path / "char.mp4"
     mp4, lic = make_character_clip(
@@ -116,6 +146,7 @@ def test_roster_and_visemes():
         resolve_style,
         text_to_visemes,
         viseme_open_amount,
+        viseme_to_mouth,
     )
 
     fox = resolve_roster("Лиса")
@@ -125,6 +156,67 @@ def test_roster_and_visemes():
     tl = text_to_visemes("ау")
     assert tl[0]["viseme"] in {"aa", "ou", "oh"}
     assert 0 <= viseme_open_amount("aa") <= 1
+    assert viseme_to_mouth("aa") == "o"
+    assert viseme_to_mouth("PP") == "small"
+
+
+def test_lip_animate_clip(tmp_path: Path):
+    out = tmp_path / "talk.mp4"
+    mp4, lic = make_character_clip(
+        out,
+        duration_sec=0.7,
+        width=240,
+        height=426,
+        fps=12,
+        style="cartoon",
+        speaker="Лиса",
+        emotion="joy",
+        visual_query="forest",
+        layout="pip",
+        text="Привет, ау!",
+        lip_animate=True,
+    )
+    assert mp4.is_file()
+    assert mp4.stat().st_size > 500
+    assert "lips:" in (lic.query or "")
+    frames = tmp_path / "talk_frames"
+    assert frames.is_dir()
+    assert any(frames.glob("f_*.png"))
+
+
+def test_preview_talking_clip_no_audio(tmp_path: Path):
+    from content_engine.character_kit import preview_talking_clip
+
+    r = preview_talking_clip(
+        text="ау",
+        style="mascot",
+        speaker="Лиса",
+        emotion="joy",
+        width=240,
+        height=426,
+        fps=12,
+        layout="pip",
+        out_dir=tmp_path,
+        with_audio=False,
+    )
+    assert r["ok"] is True
+    assert Path(r["path"]).is_file()
+    assert "rule-based" in (r.get("honesty") or "")
+
+
+def test_prefs_layout_and_lip(monkeypatch, tmp_path: Path):
+    from content_engine.character_kit import default_prefs, load_prefs, save_prefs
+
+    prefs_path = tmp_path / "character_prefs.json"
+    monkeypatch.setattr("content_engine.character_kit.PREFS_PATH", prefs_path)
+    base = default_prefs()
+    assert base["layout"] == "pip"
+    assert base["lip_animate"] is True
+    out = save_prefs({"layout": "full", "lip_animate": False})
+    assert out.get("ok") is not False
+    loaded = load_prefs()
+    assert loaded["layout"] == "full"
+    assert loaded["lip_animate"] is False
 
 
 def test_morph_target_resolution():

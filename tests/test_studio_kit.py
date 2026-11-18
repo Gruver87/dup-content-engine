@@ -30,7 +30,9 @@ def test_template_save_expands_pack(tmp_path, monkeypatch):
     assert p["color_grade"] == "cinematic"
 
 
-def test_merge_brand_and_mood_bed(tmp_path):
+def test_merge_brand_and_mood_bed(tmp_path, monkeypatch):
+    # Isolate from live out/console/studio_prefs.json (prefs win over brand.studio)
+    monkeypatch.setattr("content_engine.studio_kit.PREFS_PATH", tmp_path / "studio_prefs.json")
     brand, studio = merge_studio_into_brand(
         {"studio": {"music_mood": "calm", "sfx": False}, "audio": {}, "captions": {}}
     )

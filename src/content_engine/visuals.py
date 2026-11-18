@@ -282,6 +282,7 @@ def make_scene_clip(
     emotion: str | None = None,
     gender: str | None = None,
     use_character: bool = False,
+    dialogue_text: str | None = None,
 ) -> tuple[Path, AssetLicense]:
     """Resolve visuals with fallback chain; always returns a clip + license."""
     prov = (provider or "synthetic").lower()
@@ -319,7 +320,24 @@ def make_scene_clip(
             return out_mp4, lic
 
     if use_character and character_style and character_style != "off":
+        from content_engine.character_kit import load_prefs as load_char_prefs
         from content_engine.character_kit import make_character_clip
+
+        prefs = load_char_prefs()
+        layout = str(prefs.get("layout") or "pip")
+        lip_animate = bool(prefs.get("lip_animate", True))
+        try:
+            from content_engine.brand import load_brand
+            from content_engine.pipeline import DEFAULT_BRAND
+
+            brand = load_brand(DEFAULT_BRAND)
+            bc = brand.get("characters") or {}
+            if bc.get("layout") in {"pip", "full"}:
+                layout = str(bc["layout"])
+            if "lip_animate" in bc:
+                lip_animate = bool(bc["lip_animate"])
+        except Exception:  # noqa: BLE001
+            pass
 
         return make_character_clip(
             out_mp4,
@@ -332,6 +350,9 @@ def make_scene_clip(
             emotion=emotion,
             gender=gender,
             visual_query=visual_query,
+            layout=layout,
+            text=dialogue_text,
+            lip_animate=lip_animate,
         )
 
     if prov in {"pexels", "auto", "stock"}:

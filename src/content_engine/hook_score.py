@@ -23,6 +23,17 @@ _HOOK_WORDS = {
     "three",
     "signs",
     "instead",
+    # RU lexicon (substring match on lowercased hook)
+    "стоп",
+    "ошиб",
+    "секрет",
+    "почему",
+    "как",
+    "три",
+    "признак",
+    "отказ",
+    "вместо",
+    "большинств",
 }
 
 

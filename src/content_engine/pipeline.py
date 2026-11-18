@@ -190,6 +190,7 @@ def run_pipeline(
             emotion=scene.emotion,
             gender=scene.gender,
             use_character=use_char,
+            dialogue_text=spoken_txt,
         )
         if use_char:
             notes.append(f"character[{scene.id}]={style_key}")

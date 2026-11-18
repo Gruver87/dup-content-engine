@@ -28,6 +28,7 @@ Fail-closed: this doc describes **how top products work**, not a claim that DUP 
 | Optional HeyGen CLI | SadTalker GPU out-of-box |
 | GLB mesh preview when file in `assets/avatars/` | Full TalkingHead runtime / Azure visemes |
 | Rule-based morph drive (Oculus/ARKit names) | Guaranteed morphs on every GLB |
+| Lip-animate talking clips + cast reel mouths | ARKit / audio-driven accuracy |
 
 ## Refuse
 

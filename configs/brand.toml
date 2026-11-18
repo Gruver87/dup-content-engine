@@ -23,6 +23,7 @@ music_volume = 0.10
 [characters]
 enabled = true
 default_style = "cartoon"   # off|cartoon|anime|mascot|clay|realistic_stylized
+layout = "pip"              # pip = bust over query-colored bed | full = character plate
 # Drop Mixamo+viseme .glb into assets/avatars/ for future TalkingHead slot
 
 # Pro polish pack (CapCut/Descript/DaVinci-class via ffmpeg — not generative video AI)

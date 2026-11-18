@@ -89,11 +89,23 @@ class OpsHandler(BaseHTTPRequestHandler):
         if path == "/api/timeline":
             self._json(200, ops_api.action_timeline_get())
             return
+        if path == "/api/montage/prefs":
+            self._json(200, ops_api.action_montage_prefs())
+            return
+        if path == "/api/hook-packs":
+            self._json(200, ops_api.action_hook_packs({"action": "catalog", "language": "ru"}))
+            return
         if path == "/api/project":
             self._json(200, ops_api.action_project_load())
             return
         if path == "/api/library":
             self._json(200, ops_api.list_library())
+            return
+        if path == "/api/collections":
+            self._json(200, ops_api.action_collections({"action": "catalog"}))
+            return
+        if path == "/api/schedule":
+            self._json(200, ops_api.action_schedule({"action": "load"}))
             return
         if path == "/api/inbox":
             self._json(200, ops_api.list_inbox())
@@ -170,8 +182,15 @@ class OpsHandler(BaseHTTPRequestHandler):
                 jid = ops_api.action_process_inbox(
                     offline_tts=bool(body.get("offline_tts")),
                     limit=int(body.get("limit") or 5),
+                    require_approve=bool(body.get("require_approve")),
                 )
                 self._json(200, {"ok": True, "job_id": jid})
+                return
+            if path == "/api/inbox/approve":
+                self._json(200, ops_api.action_inbox_approve(body if body else None))
+                return
+            if path == "/api/cut":
+                self._json(200, ops_api.action_transcript_cut(body if body else None))
                 return
             if path == "/api/inbox/fixture":
                 self._json(200, ops_api.copy_fixture_to_inbox(str(body.get("name") or "")))
@@ -193,6 +212,9 @@ class OpsHandler(BaseHTTPRequestHandler):
                         offline=bool(body.get("offline", True)),
                     ),
                 )
+                return
+            if path == "/api/hook-packs":
+                self._json(200, ops_api.action_hook_packs(body if body else None))
                 return
             if path == "/api/styles":
                 self._json(200, ops_api.action_styles())
@@ -266,11 +288,20 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/project/load":
                 self._json(200, ops_api.action_project_load())
                 return
+            if path == "/api/montage/prefs":
+                self._json(200, ops_api.action_montage_prefs(body if body else None))
+                return
             if path == "/api/montage/export":
                 self._json(200, ops_api.action_montage_export())
                 return
             if path == "/api/montage/send":
                 self._json(200, ops_api.action_montage_send(body))
+                return
+            if path == "/api/collections":
+                self._json(200, ops_api.action_collections(body if body else None))
+                return
+            if path == "/api/schedule":
+                self._json(200, ops_api.action_schedule(body if body else None))
                 return
             if path == "/api/open":
                 self._json(200, ops_api.action_open_path(str(body.get("which") or "")))

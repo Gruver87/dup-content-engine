@@ -2,10 +2,14 @@ from pathlib import Path
 
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
+    apply_clip_keyframes,
     concat_clips,
     delete_media,
     image_to_clip,
     list_media,
+    list_transitions,
+    resolve_transition,
+    save_montage_prefs,
     save_project,
     save_timeline,
     save_upload,
@@ -62,9 +66,10 @@ def test_upload_trim_concat(tmp_path, monkeypatch):
     _tiny_mp4(a, 0.6)
     _tiny_mp4(b, 0.6)
     stitched = out / "stitch.mp4"
-    cat = concat_clips([a, b], stitched, width=320, height=560)
+    cat = concat_clips([a, b], stitched, width=320, height=560, transition="cut")
     assert cat["ok"] is True
     assert Path(cat["path"]).stat().st_size > 1000
+    assert cat.get("transition") == "cut"
 
     save_timeline([{"path": str(a), "name": "a", "start_sec": 0}])
     listed = list_media(limit=10)
@@ -74,6 +79,46 @@ def test_upload_trim_concat(tmp_path, monkeypatch):
     gone = delete_media(up["rel"])
     assert gone["ok"] is True
     assert not victim.is_file()
+
+
+def test_apply_clip_keyframes(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    out.mkdir(parents=True)
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    dest = out / "kf.mp4"
+    r = apply_clip_keyframes(
+        src, dest, fade_in=0.15, fade_out=0.15, zoom=1.08, width=320, height=560, fps=12
+    )
+    assert r["ok"] is True
+    assert Path(r["path"]).is_file()
+    assert r["zoom"] == 1.08
+    assert "bezier" in (r.get("honesty") or "").lower() or "CapCut" in (r.get("honesty") or "")
+
+
+def test_transitions_pack_and_fade(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    pack = list_transitions()
+    assert pack["ok"] and "fade" in pack["transitions"]
+    assert resolve_transition("nope") == "cut"
+    save_montage_prefs({"transition": "fade", "transition_sec": 0.25})
+
+    a = out / "a.mp4"
+    b = out / "b.mp4"
+    _tiny_mp4(a, 1.0)
+    _tiny_mp4(b, 1.0)
+    stitched = out / "fade.mp4"
+    cat = concat_clips(
+        [a, b], stitched, width=320, height=560, transition="fade", transition_sec=0.25
+    )
+    assert cat["ok"] is True
+    assert cat.get("transition") == "fade"
+    assert Path(cat["path"]).stat().st_size > 1000
 
 
 def test_save_project(tmp_path, monkeypatch):

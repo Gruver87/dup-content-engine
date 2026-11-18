@@ -74,6 +74,19 @@ def build_parser() -> argparse.ArgumentParser:
     ws.add_argument("--offline-tts", action="store_true")
 
     sc = sub.add_parser("score", help="Hook heuristic score for a script (not a virality claim)")
+    packs = sub.add_parser(
+        "hook-packs",
+        help="Offline hook/CTA template packs (not a virality claim)",
+    )
+    packs.add_argument("--list", action="store_true", help="List packs")
+    packs.add_argument("--pack", type=str, default="curiosity")
+    packs.add_argument("--topic", type=str, default=None)
+    packs.add_argument("--language", type=str, default="ru")
+    packs.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write offline script then apply pack (needs --topic)",
+    )
     sc.add_argument("script", type=Path)
 
     batch = sub.add_parser("batch", help="Topics file → A/B variants (+ optional renders)")
@@ -156,8 +169,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Build cast reel mp4 + HTML sheet (offline TTS by default)",
     )
+    chp.add_argument(
+        "--talk",
+        action="store_true",
+        help="Lip-animate talking clip from --text (optional TTS mux)",
+    )
+    chp.add_argument("--text", type=str, default=None, help="Dialogue line for --talk")
+    chp.add_argument("--layout", type=str, default=None, choices=["pip", "full"])
     chp.add_argument("--language", type=str, default="ru")
-    chp.add_argument("--online-tts", action="store_true", help="Allow edge-tts for cast reel")
+    chp.add_argument("--online-tts", action="store_true", help="Allow edge-tts for cast reel / talk")
+    chp.add_argument("--no-audio", action="store_true", help="--talk without TTS mux")
 
     cal = sub.add_parser("calendar", help="Local content calendar from topics (no publish)")
     cal.add_argument(
@@ -170,6 +191,18 @@ def build_parser() -> argparse.ArgumentParser:
     cal.add_argument("--start", type=str, default=None, help="YYYY-MM-DD UTC")
     cal.add_argument("--per-day", type=int, default=1)
     cal.add_argument("--gap-hours", type=float, default=3.0)
+    cal.add_argument(
+        "--schedule",
+        action="store_true",
+        help="Also write multi-platform SCHEDULE.json (plan only)",
+    )
+    cal.add_argument(
+        "--platforms",
+        type=str,
+        default="tiktok,youtube,instagram",
+        help="Comma list for --schedule: manual,tiktok,youtube,instagram",
+    )
+    cal.add_argument("--platform-gap-hours", type=float, default=1.0)
 
     asp = sub.add_parser("aspects", help="Reframe master mp4 to 9:16 / 1:1 / 16:9")
     asp.add_argument("mp4", type=Path)
@@ -482,6 +515,21 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(score_script(script), indent=2))
         return 0
 
+    if args.cmd == "hook-packs":
+        from content_engine.hook_packs import apply_to_script, catalog, render_pack
+        from content_engine.script_writer import offline_topic_script
+
+        if args.list or not args.topic:
+            print(json.dumps(catalog(language=args.language), indent=2, ensure_ascii=False))
+            return 0
+        if args.apply:
+            script = offline_topic_script(args.topic, language=args.language)
+            result = apply_to_script(script, pack_id=args.pack, language=args.language)
+        else:
+            result = render_pack(topic=args.topic, pack_id=args.pack, language=args.language)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0 if result.get("ok") else 1
+
     if args.cmd == "batch":
         from content_engine.batch import run_batch
 
@@ -605,6 +653,7 @@ def main(argv: list[str] | None = None) -> int:
             build_cast_sheet,
             export_cast_plates,
             preview_plate,
+            preview_talking_clip,
         )
 
         if args.reel:
@@ -614,6 +663,21 @@ def main(argv: list[str] | None = None) -> int:
                 width=args.width,
                 height=args.height,
                 allow_network_tts=bool(args.online_tts),
+            )
+        elif args.talk:
+            line = args.text or "Ты слышишь? Кажется, рядом кто-то есть."
+            result = preview_talking_clip(
+                text=line,
+                style=args.style,
+                speaker=args.speaker,
+                emotion=args.emotion,
+                width=args.width,
+                height=args.height,
+                layout=args.layout,
+                language=args.language,
+                out_dir=args.out,
+                allow_network_tts=bool(args.online_tts),
+                with_audio=not bool(args.no_audio),
             )
         elif args.cast:
             result = export_cast_plates(
@@ -635,21 +699,33 @@ def main(argv: list[str] | None = None) -> int:
                 width=args.width,
                 height=args.height,
                 out_dir=args.out,
+                layout=args.layout,
             )
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0 if result.get("ok") else 1
 
     if args.cmd == "calendar":
-        from content_engine.calendar import build_calendar
+        from content_engine.calendar import build_calendar, build_multi_schedule
 
-        result = build_calendar(
-            args.topics,
-            out_dir=args.out,
-            start_date=args.start,
-            per_day=args.per_day,
-            gap_hours=args.gap_hours,
-        )
-        print(json.dumps(result, indent=2))
+        if args.schedule:
+            result = build_multi_schedule(
+                args.topics,
+                out_dir=args.out,
+                start_date=args.start,
+                per_day=args.per_day,
+                gap_hours=args.gap_hours,
+                platform_gap_hours=args.platform_gap_hours,
+                platforms=args.platforms,
+            )
+        else:
+            result = build_calendar(
+                args.topics,
+                out_dir=args.out,
+                start_date=args.start,
+                per_day=args.per_day,
+                gap_hours=args.gap_hours,
+            )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0 if result.get("ok") else 1
 
     if args.cmd == "aspects":

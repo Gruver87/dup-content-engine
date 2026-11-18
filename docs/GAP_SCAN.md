@@ -17,7 +17,9 @@ CapCut · Opus Clip · Descript · ElevenLabs · InVideo / EasyViral · HeyGen �
 
 Script JSON, README teaser, edge-tts, synthetic/Pexels stub, FFmpeg bundle, ASS captions, policy gate + verified pack, export folder, CI offline ALLOW, honesty docs.
 
-**Characters (0.1.20):** local style bank + Pillow plates + console 3D preview — see [CHARACTER_3D_SCAN.md](CHARACTER_3D_SCAN.md). Not HeyGen DiT offline.
+**Characters (0.1.20+):** local style bank + Pillow plates + console 3D preview + lip-animate talking clips — see [CHARACTER_3D_SCAN.md](CHARACTER_3D_SCAN.md). Not HeyGen DiT offline.
+
+**Montage (0.1.29):** local ffmpeg **transitions pack** (xfade). Not CapCut Pro / Gen-video.
 
 ## P0 — shipped in 0.1.2
 

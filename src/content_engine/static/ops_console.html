@@ -549,7 +549,7 @@ body {
           <div class="chip-row" style="margin-top:8px">
             <span class="chip have" data-i18n="chipHaveQuick">есть quick start</span>
             <span class="chip have" data-i18n="chipHaveThumbs">есть recent thumbs</span>
-            <span class="chip miss" data-i18n="chipMissCalendar">нет Clipflow calendar</span>
+            <span class="chip have" data-i18n="chipHaveCalendar">есть local calendar</span>
           </div>
         </div>
         <div class="pill-row" style="margin:0">
@@ -580,12 +580,12 @@ body {
     <section class="panel" id="tab-studio">
       <div class="gap-scan indigo">
         <h4 data-i18n="gapStudioTitle">Студия · сверка CapCut / Descript</h4>
-        <p class="sub" data-i18n="gapStudioSub">Есть: script→TTS→captions+grade+motion+music. Нет (честно): transcript-cut как Descript, Seedance Gen, eye-contact.</p>
+        <p class="sub" data-i18n="gapStudioSub">Есть: script→TTS→captions+grade+motion+music+text-edit cut. Нет (честно): Descript word-level ripple, Seedance Gen, eye-contact.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveEmotion">есть emotion TTS</span>
           <span class="chip have" data-i18n="chipHaveAspect">есть 9:16 / 1:1 / 16:9</span>
-          <span class="chip miss" data-i18n="chipMissTranscript">нет text-edit cut</span>
-          <span class="chip soon" data-i18n="chipSoonHook">скоро: hook/CTA packs</span>
+          <span class="chip have" data-i18n="chipHaveHook">есть hook/CTA packs</span>
+          <span class="chip have" data-i18n="chipHaveTranscript">есть text-edit cut</span>
         </div>
       </div>
       <div class="workbench-tabs" id="wbTabs">
@@ -627,7 +627,11 @@ body {
             <textarea id="scriptOut" readonly data-i18n-placeholder="scriptPh" placeholder="script.json"></textarea>
             <div class="row" style="margin-top:10px">
               <button class="btn" id="btnRunScript" disabled data-i18n="btnRunScript">Render script</button>
+              <button class="btn ghost" id="btnLoadCut" data-i18n="btnLoadCut">Load cut desk</button>
+              <button class="btn ghost" id="btnApplyCut" data-i18n="btnApplyCut">Apply cut</button>
             </div>
+            <p class="sub" style="margin-top:10px" data-i18n="cutHint">Text-edit cut: uncheck scenes to drop (not Descript word-level).</p>
+            <ul class="list" id="cutList" style="margin-top:8px"></ul>
           </div>
           <div class="card">
             <h3 data-i18n="activePack">Active studio pack</h3>
@@ -682,6 +686,7 @@ body {
           <div class="chip-row">
             <span class="chip have" data-i18n="chipHaveStyles">есть style bank</span>
             <span class="chip have" data-i18n="chipHave3d">есть 3D preview</span>
+            <span class="chip have" data-i18n="chipHaveLips">есть lip-animate clips</span>
             <span class="chip miss" data-i18n="chipMissHeygen">нет photoreal DiT offline</span>
             <span class="chip soon" data-i18n="chipSoonGlb">скоро: TalkingHead + GLB</span>
           </div>
@@ -720,10 +725,13 @@ body {
             </label>
             <div class="row" style="margin-top:10px">
               <button class="btn primary" id="btnCharSpeak" data-i18n="charSpeak">Speak preview</button>
+              <button class="btn primary" id="btnCharTalk" data-i18n="charTalk">Talking clip</button>
               <button class="btn ghost" id="btnCharStop" data-i18n="charStop">Stop</button>
               <button class="btn ghost" id="btnCharDemo" data-i18n="charDemo">Render cast demo</button>
               <button class="btn ghost" id="btnCastPlates" data-i18n="castPlates">Export cast plates</button>
               <button class="btn primary" id="btnCastReel" data-i18n="castReel">Cast reel</button>
+              <button class="btn ghost" id="btnOpenSheet" data-i18n="openSheet">Open cast sheet</button>
+              <button class="btn ghost" id="btnOpenChars" data-i18n="openChars">Open characters/</button>
             </div>
             <p class="sub mono" id="charMorphMeta" style="margin-top:8px"></p>
           </div>
@@ -732,6 +740,12 @@ body {
             <p class="sub" data-i18n="charStylesHint">cartoon · anime · mascot · clay · realistic_stylized</p>
             <div class="choice-grid" id="charStyleGrid" style="margin-top:10px"></div>
             <label class="check" style="margin-top:14px"><input type="checkbox" id="charEnabled" checked/> <span data-i18n="charEnabled">Use character plates in render</span></label>
+            <p class="sub" style="margin-top:12px" data-i18n="charLayoutHint">Layout in render</p>
+            <div class="choice-grid" id="charLayoutGrid" style="margin-top:6px">
+              <button type="button" class="choice on" data-clayout="pip"><strong>PIP</strong><span class="sub" data-i18n="charLayoutPip">bust over bed</span></button>
+              <button type="button" class="choice" data-clayout="full"><strong>Full</strong><span class="sub" data-i18n="charLayoutFull">character plate</span></button>
+            </div>
+            <label class="check" style="margin-top:12px"><input type="checkbox" id="charLipAnimate" checked/> <span data-i18n="charLipAnimate">Lip-animate mouths in clips (rule-based)</span></label>
             <div class="row" style="margin-top:12px">
               <button class="btn" id="btnSaveChars" data-i18n="saveChars">Save character prefs</button>
               <button class="btn ghost" id="btnOpenAvatars" data-i18n="openAvatars">Open avatars/</button>
@@ -750,18 +764,28 @@ body {
           </div>
           <ul class="list" id="ideasList" style="margin-top:12px"></ul>
         </div>
+        <div class="card" style="margin-top:14px">
+          <h3 data-i18n="hookPacksTitle">Hook / CTA packs</h3>
+          <p class="sub" data-i18n="hookPacksHint">Offline templates for first/last beats — not a virality claim.</p>
+          <div class="choice-grid" id="hookPackGrid" style="margin-top:10px"></div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary" id="btnApplyHookPack" data-i18n="applyHookPack">Apply to topic → script</button>
+            <button class="btn ghost" id="btnPreviewHook" data-i18n="previewHook">Preview lines</button>
+          </div>
+          <div class="log" id="hookPackLog" style="margin-top:12px"></div>
+        </div>
       </div>
     </section>
 
     <section class="panel" id="tab-montage">
       <div class="gap-scan orange">
         <h4 data-i18n="gapMontageTitle">Монтаж · сверка CapCut Desktop</h4>
-        <p class="sub" data-i18n="gapMontageSub">Есть: import/URL/trim/dup/stitch/save/export/send. Нет: multi-track keyframes, auto-reframe AI, transitions library.</p>
+        <p class="sub" data-i18n="gapMontageSub">Есть: import/URL/trim/dup/stitch/save/export/send/transitions/basic KF. Нет: multi-track bezier, auto-reframe AI.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveShip">есть Save·Export·Send</span>
           <span class="chip have" data-i18n="chipHaveUndo">есть Undo/Redo</span>
-          <span class="chip miss" data-i18n="chipMissKeyframe">нет keyframes</span>
-          <span class="chip miss" data-i18n="chipMissTrans">нет transitions pack</span>
+          <span class="chip have" data-i18n="chipHaveTrans">есть transitions pack</span>
+          <span class="chip have" data-i18n="chipHaveKeyframe">есть basic keyframes</span>
         </div>
       </div>
       <div class="ship-bar">
@@ -812,10 +836,22 @@ body {
             </div>
           </div>
           <p class="sub" data-i18n="timelineHint">Add → reorder → trim → save → stitch. Delete / Undo like CapCut.</p>
+          <p class="sub" style="margin-top:10px" data-i18n="transHint">Transitions (xfade)</p>
+          <div class="choice-grid" id="transGrid" style="margin-top:6px"></div>
+          <label class="field" style="margin-top:8px;max-width:140px"><span data-i18n="transDur">Transition (s)</span>
+            <input id="transDur" type="number" min="0.15" max="1.2" step="0.05" value="0.35"/>
+          </label>
           <ul class="list" id="timelineList"></ul>
           <div class="row" style="margin-top:10px">
             <label class="field"><span data-i18n="trimStart">Start (s)</span><input id="trimStart" type="number" min="0" step="0.1" value="0" style="min-width:90px"/></label>
             <label class="field"><span data-i18n="trimDur">Duration (s)</span><input id="trimDur" type="number" min="0.2" step="0.1" value="" placeholder="full" style="min-width:90px"/></label>
+          </div>
+          <p class="sub" style="margin-top:10px" data-i18n="kfHint">Basic keyframes (selected clip)</p>
+          <div class="row" style="margin-top:6px">
+            <label class="field"><span data-i18n="kfFadeIn">Fade in</span><input id="kfFadeIn" type="number" min="0" max="2" step="0.05" value="0" style="min-width:80px"/></label>
+            <label class="field"><span data-i18n="kfFadeOut">Fade out</span><input id="kfFadeOut" type="number" min="0" max="2" step="0.05" value="0" style="min-width:80px"/></label>
+            <label class="field"><span data-i18n="kfZoom">Zoom</span><input id="kfZoom" type="number" min="1" max="1.25" step="0.01" value="1" style="min-width:80px"/></label>
+            <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
           </div>
           <div class="row" style="margin-top:10px">
             <button class="btn ghost" id="btnTrim" data-i18n="btnTrim">Trim</button>
@@ -832,12 +868,12 @@ body {
     <section class="panel" id="tab-library">
       <div class="gap-scan cyan">
         <h4 data-i18n="gapLibTitle">Библиотека · сверка Opus collections</h4>
-        <p class="sub" data-i18n="gapLibSub">Есть: renders search, assets upload, open folders. Нет: client collections, object/dialogue smart search.</p>
+        <p class="sub" data-i18n="gapLibSub">Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object/dialogue search, CapCut Space.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveSearch">есть поиск</span>
           <span class="chip have" data-i18n="chipHaveUpload">есть upload</span>
-          <span class="chip miss" data-i18n="chipMissCollections">нет collections</span>
-          <span class="chip soon" data-i18n="chipSoonThumbs">скоро: thumbnails grid</span>
+          <span class="chip have" data-i18n="chipHaveCollections">есть collections</span>
+          <span class="chip have" data-i18n="chipHaveThumbsGrid">есть thumbnails grid</span>
         </div>
       </div>
       <div class="card">
@@ -846,8 +882,22 @@ body {
           <button class="btn ghost" id="btnLibRefresh" data-i18n="refresh">Refresh</button>
         </div>
         <input class="search" id="libSearch" data-i18n-placeholder="searchPh" placeholder="Search renders…"/>
+        <p class="sub" style="margin-top:10px" data-i18n="libThumbsTitle">Thumbnails</p>
+        <div class="thumb-grid" id="libThumbs" style="margin-top:8px"></div>
+        <p class="sub mono" id="charLibMeta" style="margin:10px 0"></p>
         <ul class="list" id="libList"></ul>
-        <div class="row" style="margin-top:10px"><button class="btn ghost" id="btnOpenOut" data-i18n="openOut">Open out/</button><button class="btn ghost" id="btnOpenAssets" data-i18n="openAssets">Open assets/</button></div>
+        <div class="row" style="margin-top:12px;align-items:flex-end">
+          <label class="field"><span data-i18n="libCollection">Collection</span>
+            <select id="libCollectionSelect"></select>
+          </label>
+          <label class="field"><span data-i18n="libNewCollection">New</span>
+            <input id="libNewCollection" placeholder="shorts"/>
+          </label>
+          <button class="btn ghost" id="btnColCreate" data-i18n="colCreate">Create</button>
+          <button class="btn" id="btnColAdd" data-i18n="colAdd">Add selected</button>
+        </div>
+        <ul class="list" id="colItems" style="margin-top:10px"></ul>
+        <div class="row" style="margin-top:10px"><button class="btn ghost" id="btnOpenOut" data-i18n="openOut">Open out/</button><button class="btn ghost" id="btnOpenAssets" data-i18n="openAssets">Open assets/</button><button class="btn ghost" id="btnOpenChars2" data-i18n="openChars">Open characters/</button></div>
       </div>
       <div class="card" style="margin-top:14px">
         <h3 data-i18n="uploadAssets">Upload to assets/</h3>
@@ -866,11 +916,11 @@ body {
     <section class="panel" id="tab-queue">
       <div class="gap-scan amber">
         <h4 data-i18n="gapQueueTitle">Очередь · сверка Habr / Thrice / content-factory</h4>
-        <p class="sub" data-i18n="gapQueueSub">Есть: drop-folder inbox, dry-run, cartoon fixture. Нет: Telegram remote approve, n8n webhook, virality score (не выдумываем).</p>
+        <p class="sub" data-i18n="gapQueueSub">Есть: inbox, dry-run, fixture, local approve gate. Нет: Telegram Bot API remote, n8n webhook, fake virality.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveInbox">есть inbox</span>
           <span class="chip have" data-i18n="chipHaveDry">есть dry-run</span>
-          <span class="chip miss" data-i18n="chipMissTg">нет Telegram approve</span>
+          <span class="chip have" data-i18n="chipHaveTg">есть local approve gate</span>
           <span class="chip miss" data-i18n="chipMissVirality">нет fake virality</span>
         </div>
       </div>
@@ -881,11 +931,15 @@ body {
           <div class="drop" id="inboxDrop" data-i18n="dropInbox">Drop script.json here</div>
           <textarea id="inboxPaste" placeholder='{"title":"...","scenes":[...]}' style="margin-top:12px"></textarea>
           <div class="row" style="margin-top:10px">
-            <button class="btn" id="btnInboxSave" data-i18n="toQueue">To queue</button>
-            <button class="btn ghost" id="btnInboxRun" data-i18n="process">Process</button>
-            <button class="btn ghost" id="btnInboxFixture" data-i18n="addCartoon">+ cartoon fixture</button>
-            <button class="btn ghost" id="btnInboxDry" data-i18n="dryRun">Dry-run</button>
-            <button class="btn ghost" id="btnOpenInbox2" data-i18n="openInbox">Open inbox</button>
+            <label class="check"><input type="checkbox" id="inboxRequireApprove" checked/> <span data-i18n="requireApprove">Require approve before process</span></label>
+            <div class="row" style="margin-top:10px">
+              <button class="btn" id="btnInboxSave" data-i18n="toQueue">To queue</button>
+              <button class="btn ghost" id="btnInboxApprove" data-i18n="btnApprove">Approve selected</button>
+              <button class="btn ghost" id="btnInboxRun" data-i18n="process">Process</button>
+              <button class="btn ghost" id="btnInboxFixture" data-i18n="addCartoon">+ cartoon fixture</button>
+              <button class="btn ghost" id="btnInboxDry" data-i18n="dryRun">Dry-run</button>
+              <button class="btn ghost" id="btnOpenInbox2" data-i18n="openInbox">Open inbox</button>
+            </div>
           </div>
         </div>
         <div class="card">
@@ -900,12 +954,12 @@ body {
     <section class="panel" id="tab-publish">
       <div class="gap-scan coral">
         <h4 data-i18n="gapPubTitle">Публикация · сверка CapCut share / Clipflow</h4>
-        <p class="sub" data-i18n="gapPubSub">Есть: ready · finish · export folder · TikTok official API. Нет: auto-schedule 6 platforms, analytics invent — только ingest реальных CSV.</p>
+        <p class="sub" data-i18n="gapPubSub">Есть: ready·finish·export·TikTok API·local multi-schedule·YT/IG key presence. Нет: auto-post to 6 clouds; analytics only from real CSV.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveReady">есть ready/finish</span>
           <span class="chip have" data-i18n="chipHaveTiktok">есть TikTok API path</span>
-          <span class="chip miss" data-i18n="chipMissSched">нет multi-schedule</span>
-          <span class="chip soon" data-i18n="chipSoonYt">скоро: YT/IG keys UI</span>
+          <span class="chip have" data-i18n="chipHaveSched">есть multi-schedule</span>
+          <span class="chip have" data-i18n="chipHaveYtKeys">есть YT/IG keys UI</span>
         </div>
       </div>
 
@@ -936,8 +990,25 @@ body {
         <div class="card">
           <h3 data-i18n="keysTitle">Keys (presence only)</h3>
           <div id="keysBox"></div>
-          <p class="sub" style="margin-top:12px" data-i18n="keysHint">TikTok / YT / IG — official API only. Cookie bots refused.</p>
+          <p class="sub" style="margin-top:12px" data-i18n="keysHint">TikTok / YT / IG — official API only. Cookie bots refused. Values never shown.</p>
         </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3 data-i18n="schedTitle">Local multi-schedule</h3>
+        <p class="sub" data-i18n="schedHint">Plan TikTok / YouTube / Instagram slots from topics — not auto-post, not Clipflow cloud.</p>
+        <div class="row" style="margin-top:10px">
+          <label class="check"><input type="checkbox" id="platTiktok" checked/> tiktok</label>
+          <label class="check"><input type="checkbox" id="platYoutube" checked/> youtube</label>
+          <label class="check"><input type="checkbox" id="platInstagram" checked/> instagram</label>
+          <label class="check"><input type="checkbox" id="platManual"/> manual</label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnBuildSchedule" data-i18n="btnBuildSchedule">Build schedule</button>
+          <button class="btn ghost" id="btnLoadSchedule" data-i18n="btnLoadSchedule">Reload</button>
+          <button class="btn ghost" id="btnOpenCalendar" data-i18n="btnOpenCalendar">Open calendar/</button>
+        </div>
+        <ul class="list" id="scheduleList" style="margin-top:12px"></ul>
+        <div class="log" id="schedLog" style="margin-top:12px"></div>
       </div>
     </section>
 
@@ -1032,32 +1103,50 @@ const I18N = {
     dryRun: "Dry-run", copyScript: "Копировать script JSON",
 
     gapStudioTitle: "Студия · сверка CapCut / Descript",
-    gapStudioSub: "Есть: script→TTS→captions+grade+motion+music. Нет: transcript-cut, Seedance Gen, eye-contact.",
+    gapStudioSub: "Есть: script→TTS→captions+grade+motion+music+text-edit cut. Нет: Descript word-level, Seedance Gen, eye-contact.",
     chipHaveEmotion: "есть emotion TTS", chipHaveAspect: "есть 9:16 / 1:1 / 16:9",
-    chipMissTranscript: "нет text-edit cut", chipSoonHook: "скоро: hook/CTA packs",
+    chipHaveHook: "есть hook/CTA packs", chipHaveTranscript: "есть text-edit cut",
+    cutHint: "Text-edit cut: сними галочки со сцен (не word-level Descript).",
+    btnLoadCut: "Cut desk", btnApplyCut: "Применить cut",
+    hookPacksTitle: "Hook / CTA packs",
+    hookPacksHint: "Офлайн-шаблоны первого/последнего бита — не прогноз виральности.",
+    applyHookPack: "Применить к теме → script",
+    previewHook: "Превью строк",
     gapMontageTitle: "Монтаж · сверка CapCut Desktop",
-    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send. Нет: keyframes, auto-reframe, transitions pack.",
+    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send/transitions/basic KF. Нет: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
-    chipMissKeyframe: "нет keyframes", chipMissTrans: "нет transitions pack",
+    chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
+    kfHint: "Базовые keyframes (выбранный клип)",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", btnApplyKf: "Применить KF",
+    transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
-    gapLibSub: "Есть: поиск, upload, папки. Нет: client collections, smart object search.",
+    gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
     chipHaveSearch: "есть поиск", chipHaveUpload: "есть upload",
-    chipMissCollections: "нет collections", chipSoonThumbs: "скоро: thumbnails grid",
+    chipHaveCollections: "есть collections", chipHaveThumbsGrid: "есть thumbnails grid",
+    libThumbsTitle: "Превью", libCollection: "Коллекция", libNewCollection: "Новая",
+    colCreate: "Создать", colAdd: "В выбранную", colEmpty: "Коллекция пуста", colRemove: "Убрать",
+    makeThumb: "Thumb",
     gapQueueTitle: "Очередь · сверка Habr / Thrice / content-factory",
-    gapQueueSub: "Есть: inbox, dry-run, fixture. Нет: Telegram approve, n8n webhook, fake virality.",
+    gapQueueSub: "Есть: inbox, dry-run, fixture, local approve. Нет: Telegram Bot API, n8n webhook, fake virality.",
     chipHaveInbox: "есть inbox", chipHaveDry: "есть dry-run",
-    chipMissTg: "нет Telegram approve", chipMissVirality: "нет fake virality",
+    chipHaveTg: "есть local approve gate", chipMissVirality: "нет fake virality",
+    requireApprove: "Нужен approve перед process",
+    btnApprove: "Approve выбранный",
     gapPubTitle: "Публикация · сверка CapCut share / Clipflow",
-    gapPubSub: "Есть: ready·finish·export·TikTok API. Нет: multi-schedule; аналитика только из реальных CSV.",
+    gapPubSub: "Есть: ready·finish·export·TikTok·local schedule·YT/IG presence. Нет: auto-post в 6 облаков; аналитика только из CSV.",
     chipHaveReady: "есть ready/finish", chipHaveTiktok: "есть TikTok API path",
-    chipMissSched: "нет multi-schedule", chipSoonYt: "скоро: YT/IG keys UI",
+    chipHaveSched: "есть multi-schedule", chipHaveYtKeys: "есть YT/IG keys UI",
+    schedTitle: "Локальный multi-schedule",
+    schedHint: "План слотов TikTok/YouTube/Instagram из topics — не автопост.",
+    btnBuildSchedule: "Собрать schedule", btnLoadSchedule: "Обновить", btnOpenCalendar: "Открыть calendar/",
+    schedEmpty: "Расписание пусто — соберите из topics",
     gapToolsTitle: "Инструменты · сверка suite drawers",
     gapToolsSub: "Create / Polish / Ship. Score локальный — не Runway Gen.",
     chipHaveGroups: "есть группы", chipHaveLocal: "есть local polish", chipMissGen: "нет Gen-video claim",
     gapSysTitle: "Система · сверка ops desks",
     gapSysSub: "Есть: doctor, open folders, online. Нет: VPS agent, CapCut Space sync.",
     chipHaveDoctor: "есть doctor", chipHaveOpen: "есть open folders", chipMissCloud: "нет CapCut Space sync",
-    chipHaveQuick: "есть quick start", chipHaveThumbs: "есть recent thumbs", chipMissCalendar: "нет Clipflow calendar",
+    chipHaveQuick: "есть quick start", chipHaveThumbs: "есть recent thumbs", chipHaveCalendar: "есть local calendar",
     themeLight: "Светлый", themeDark: "Тёмный", refresh: "Обновить",
     recentJobs: "Последние задания", preview: "Превью",
     wbCompose: "Сборка", wbLook: "Образ", wbAudio: "Музыка & SFX", wbIdeas: "Идеи",
@@ -1066,15 +1155,22 @@ const I18N = {
     gapCharTitle: "Персонажи · 3D / стили",
     gapCharSub: "Локальный Character Kit + procedural Three.js. Не HeyGen DiT / SadTalker GPU.",
     chipHaveStyles: "есть style bank", chipHave3d: "есть 3D preview",
+    chipHaveLips: "есть lip-animate clips",
     chipMissHeygen: "нет photoreal DiT offline", chipSoonGlb: "скоро: TalkingHead + GLB",
+    charTalk: "Talking clip",
     charPreview: "3D превью", charFallback: "Загрузка 3D…",
     charSpeaker: "Спикер", charEmotion: "Эмоция",
     charStyles: "Стили персонажей",
     charStylesHint: "cartoon · anime · mascot · clay · realistic_stylized",
+    charLayoutHint: "Раскладка в рендере",
+    charLayoutPip: "бюст поверх фона",
+    charLayoutFull: "целая плашка",
+    charLipAnimate: "Анимация рта в клипах (rule-based)",
     charEnabled: "Плейты персонажей в рендере",
     saveChars: "Сохранить персонажей", openAvatars: "Открыть avatars/",
     charGlb: "3D модель (.glb)", charPlate: "Plate PNG",
     charCast: "Состав", charLine: "Реплика", charSpeak: "Speak превью", charStop: "Стоп", charDemo: "Рендер cast demo", castPlates: "Экспорт cast plates", castReel: "Cast reel",
+    openSheet: "Открыть cast sheet", openChars: "Открыть characters/",
     activePack: "Активный studio pack", packHint: "Шаблон + образ + музыка на каждый рендер.",
     templates: "Шаблоны", tplHint: "Один pack = титры + цвет + motion + музыка.",
     colorGrade: "Цветокор", motion: "Motion", musicMood: "Настроение музыки",
@@ -1165,32 +1261,50 @@ const I18N = {
     dryRun: "Dry-run", copyScript: "Copy script JSON",
 
     gapStudioTitle: "Studio · CapCut / Descript scan",
-    gapStudioSub: "Have: script→TTS→captions+grade+motion+music. Missing: transcript-cut, Seedance Gen, eye-contact.",
+    gapStudioSub: "Have: script→TTS→captions+grade+motion+music+text-edit cut. Missing: Descript word-level, Seedance Gen, eye-contact.",
     chipHaveEmotion: "have emotion TTS", chipHaveAspect: "have 9:16 / 1:1 / 16:9",
-    chipMissTranscript: "no text-edit cut", chipSoonHook: "soon: hook/CTA packs",
+    chipHaveHook: "have hook/CTA packs", chipHaveTranscript: "have text-edit cut",
+    cutHint: "Text-edit cut: uncheck scenes to drop (not Descript word-level).",
+    btnLoadCut: "Cut desk", btnApplyCut: "Apply cut",
+    hookPacksTitle: "Hook / CTA packs",
+    hookPacksHint: "Offline templates for first/last beats — not a virality claim.",
+    applyHookPack: "Apply to topic → script",
+    previewHook: "Preview lines",
     gapMontageTitle: "Montage · CapCut Desktop scan",
-    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send. Missing: keyframes, auto-reframe, transitions pack.",
+    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send/transitions/basic KF. Missing: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
-    chipMissKeyframe: "no keyframes", chipMissTrans: "no transitions pack",
+    chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
+    kfHint: "Basic keyframes (selected clip)",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", btnApplyKf: "Apply KF",
+    transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
-    gapLibSub: "Have: search, upload, folders. Missing: client collections, smart object search.",
+    gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
     chipHaveSearch: "have search", chipHaveUpload: "have upload",
-    chipMissCollections: "no collections", chipSoonThumbs: "soon: thumbnails grid",
+    chipHaveCollections: "have collections", chipHaveThumbsGrid: "have thumbnails grid",
+    libThumbsTitle: "Thumbnails", libCollection: "Collection", libNewCollection: "New",
+    colCreate: "Create", colAdd: "Add selected", colEmpty: "Collection empty", colRemove: "Remove",
+    makeThumb: "Thumb",
     gapQueueTitle: "Queue · Habr / Thrice / content-factory scan",
-    gapQueueSub: "Have: inbox, dry-run, fixture. Missing: Telegram approve, n8n webhook, fake virality.",
+    gapQueueSub: "Have: inbox, dry-run, fixture, local approve. Missing: Telegram Bot API, n8n webhook, fake virality.",
     chipHaveInbox: "have inbox", chipHaveDry: "have dry-run",
-    chipMissTg: "no Telegram approve", chipMissVirality: "no fake virality",
+    chipHaveTg: "have local approve gate", chipMissVirality: "no fake virality",
+    requireApprove: "Require approve before process",
+    btnApprove: "Approve selected",
     gapPubTitle: "Publish · CapCut share / Clipflow scan",
-    gapPubSub: "Have: ready·finish·export·TikTok API. Missing: multi-schedule; analytics only from real CSV.",
+    gapPubSub: "Have: ready·finish·export·TikTok·local schedule·YT/IG presence. Missing: auto-post to 6 clouds; analytics only from CSV.",
     chipHaveReady: "have ready/finish", chipHaveTiktok: "have TikTok API path",
-    chipMissSched: "no multi-schedule", chipSoonYt: "soon: YT/IG keys UI",
+    chipHaveSched: "have multi-schedule", chipHaveYtKeys: "have YT/IG keys UI",
+    schedTitle: "Local multi-schedule",
+    schedHint: "Plan TikTok/YouTube/Instagram slots from topics — not auto-post.",
+    btnBuildSchedule: "Build schedule", btnLoadSchedule: "Reload", btnOpenCalendar: "Open calendar/",
+    schedEmpty: "Schedule empty — build from topics",
     gapToolsTitle: "Tools · suite drawers scan",
     gapToolsSub: "Create / Polish / Ship. Local score — not Runway Gen.",
     chipHaveGroups: "have groups", chipHaveLocal: "have local polish", chipMissGen: "no Gen-video claim",
     gapSysTitle: "System · ops desks scan",
     gapSysSub: "Have: doctor, open folders, online. Missing: VPS agent, CapCut Space sync.",
     chipHaveDoctor: "have doctor", chipHaveOpen: "have open folders", chipMissCloud: "no CapCut Space sync",
-    chipHaveQuick: "have quick start", chipHaveThumbs: "have recent thumbs", chipMissCalendar: "no Clipflow calendar",
+    chipHaveQuick: "have quick start", chipHaveThumbs: "have recent thumbs", chipHaveCalendar: "have local calendar",
     themeLight: "Light", themeDark: "Dark", refresh: "Refresh",
     recentJobs: "Recent jobs", preview: "Preview",
     wbCompose: "Compose", wbLook: "Look", wbAudio: "Music & SFX", wbIdeas: "Ideas",
@@ -1199,15 +1313,22 @@ const I18N = {
     gapCharTitle: "Characters · 3D / styles",
     gapCharSub: "Local Character Kit + procedural Three.js. Not HeyGen DiT / SadTalker GPU.",
     chipHaveStyles: "have style bank", chipHave3d: "have 3D preview",
+    chipHaveLips: "have lip-animate clips",
     chipMissHeygen: "no photoreal DiT offline", chipSoonGlb: "soon: TalkingHead + GLB",
+    charTalk: "Talking clip",
     charPreview: "3D preview", charFallback: "Loading 3D…",
     charSpeaker: "Speaker", charEmotion: "Emotion",
     charStyles: "Character styles",
     charStylesHint: "cartoon · anime · mascot · clay · realistic_stylized",
+    charLayoutHint: "Layout in render",
+    charLayoutPip: "bust over bed",
+    charLayoutFull: "character plate",
+    charLipAnimate: "Lip-animate mouths in clips (rule-based)",
     charEnabled: "Use character plates in render",
     saveChars: "Save character prefs", openAvatars: "Open avatars/",
     charGlb: "3D model (.glb)", charPlate: "Plate PNG",
     charCast: "Cast", charLine: "Line", charSpeak: "Speak preview", charStop: "Stop", charDemo: "Render cast demo", castPlates: "Export cast plates", castReel: "Cast reel",
+    openSheet: "Open cast sheet", openChars: "Open characters/",
     activePack: "Active studio pack", packHint: "Template + look + music apply on every render.",
     templates: "Templates", tplHint: "One pack = captions + grade + motion + music.",
     colorGrade: "Color grade", motion: "Motion", musicMood: "Music mood",
@@ -1274,6 +1395,9 @@ let STUDIO = null;
 let PREFS = {};
 let MEDIA = [];
 let TIMELINE = [];
+let TRANSITION = "cut";
+let TRANSITION_SEC = 0.35;
+let TRANSITIONS_CAT = null;
 let SELECTED = null;
 let TL_INDEX = null;
 let DIRTY = false;
@@ -1385,32 +1509,228 @@ function renderMetrics(s) {
   if (first?.rel) setPreview(first.rel, first.name + " · " + Math.round(first.size/1024) + " KB");
   $("ver").textContent = "v" + (s.version || "?");
   const keys = s.doctor?.keys_present || {};
+  const keyLabels = {
+    tiktok_client: "TikTok client",
+    tiktok_access: "TikTok access token",
+    youtube_secrets: "YouTube client_secrets.json",
+    youtube_token: "YouTube token.json",
+    instagram: "Instagram Graph (IG_USER_ID+token)",
+    elevenlabs: "ElevenLabs",
+    pexels: "Pexels",
+  };
   $("keysBox").innerHTML = Object.entries(keys).map(([k,v]) =>
-    `<div class="check ${v?"ok":""}"><span class="dot"></span><span class="mono">${k}: ${v?"present":"missing"}</span></div>`
+    `<div class="check ${v?"ok":""}"><span class="dot"></span><span class="mono">${keyLabels[k]||k}: ${v?"present":"missing"}</span></div>`
   ).join("") || `<p class="sub">offline OK</p>`;
   $("doctorLog").textContent = JSON.stringify(s.doctor, null, 2);
+  loadScheduleIntoUi();
+}
+
+function selectedPlatforms() {
+  const plats = [];
+  if ($("platTiktok")?.checked) plats.push("tiktok");
+  if ($("platYoutube")?.checked) plats.push("youtube");
+  if ($("platInstagram")?.checked) plats.push("instagram");
+  if ($("platManual")?.checked) plats.push("manual");
+  return plats.length ? plats : ["manual"];
+}
+function renderScheduleList(data) {
+  const el = $("scheduleList");
+  if (!el) return;
+  const entries = (data && data.schedule && data.schedule.entries) || (data && data.entries) || [];
+  el.innerHTML = entries.slice(0, 24).map(e =>
+    `<li><div><strong>${e.platform || "?"}</strong> · ${String(e.topic||"").slice(0,48)}</div>
+     <div class="mono">${(e.when_utc||"").slice(0,16)} · hook ${e.hook_score ?? "—"}</div></li>`
+  ).join("") || `<li>${t("schedEmpty")}</li>`;
+}
+async function loadScheduleIntoUi() {
+  try {
+    const r = await api("/api/schedule");
+    renderScheduleList(r);
+    if ($("schedLog") && (r.schedule || r.calendar)) {
+      log($("schedLog"), { count: r.schedule?.count || r.calendar?.count || 0, honesty: r.honesty });
+    }
+  } catch (e) { /* ignore until publish tab used */ }
+}
+$("btnLoadSchedule")?.addEventListener("click", () => loadScheduleIntoUi());
+$("btnOpenCalendar")?.addEventListener("click", () => openPath("calendar"));
+$("btnBuildSchedule")?.addEventListener("click", async () => {
+  const lang = $("lang")?.value || LANG || "ru";
+  const topics = lang.startsWith("ru") ? "topics.ru.example.txt" : "topics.example.txt";
+  const r = await api("/api/schedule", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "build",
+      topics,
+      platforms: selectedPlatforms(),
+      per_day: 1,
+      gap_hours: 6,
+      platform_gap_hours: 1,
+    }),
+  });
+  log($("schedLog"), r);
+  renderScheduleList(r);
+  if (r.ok) toast(t("btnBuildSchedule") + " · " + (r.count || 0));
+  else toast(r.error || "schedule failed");
+});
+
+let LIB_SELECTED_REL = null;
+let LIB_COLLECTIONS = null;
+let LIB_COL_ID = "favorites";
+
+function renderLibThumbs(items) {
+  const el = $("libThumbs");
+  if (!el) return;
+  el.innerHTML = items.slice(0, 24).map(it => {
+    const thumb = it.thumb_rel
+      ? `<img src="${mediaUrl(it.thumb_rel)}" alt="" style="width:100%;height:72px;object-fit:cover;border-radius:8px;display:block"/>`
+      : `<div style="height:72px;border-radius:8px;background:linear-gradient(135deg,#1e293b,#334155);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:0.7rem">mp4</div>`;
+    return `<button type="button" data-prev="${it.rel}" data-sel="${it.rel}" class="${LIB_SELECTED_REL===it.rel?"on":""}">${thumb}<div class="t">${it.name}</div><div class="s">${Math.round((it.size||0)/1024)}KB</div></button>`;
+  }).join("") || `<span class="sub">${t("emptyLib")}</span>`;
+  el.onclick = async (e) => {
+    const b = e.target.closest("button[data-prev]");
+    if (!b) return;
+    LIB_SELECTED_REL = b.dataset.sel || b.dataset.prev;
+    document.querySelectorAll("#libThumbs button").forEach(x => x.classList.toggle("on", x.dataset.sel === LIB_SELECTED_REL));
+    setPreview(b.dataset.prev);
+  };
+}
+
+function renderCollectionsUI() {
+  const sel = $("libCollectionSelect");
+  const cols = (LIB_COLLECTIONS && LIB_COLLECTIONS.collections) || {};
+  if (sel) {
+    const keys = Object.keys(cols);
+    if (!keys.includes(LIB_COL_ID) && keys.length) LIB_COL_ID = keys[0];
+    sel.innerHTML = keys.map(k => {
+      const c = cols[k];
+      const label = LANG==="ru" ? (c.label_ru||c.label||k) : (c.label||k);
+      return `<option value="${k}" ${k===LIB_COL_ID?"selected":""}>${label} (${c.count||0})</option>`;
+    }).join("");
+  }
+  const list = $("colItems");
+  if (!list) return;
+  const items = (cols[LIB_COL_ID] && cols[LIB_COL_ID].items) || [];
+  list.innerHTML = items.map(it => `
+    <li>
+      <div><div><strong>${it.name||it.rel}</strong></div><div class="mono">${it.rel}</div></div>
+      <div class="mini">
+        <button class="btn ghost" data-prev="${it.rel}">Preview</button>
+        <button class="btn ghost" data-col-rm="${it.rel}">${t("colRemove")}</button>
+      </div>
+    </li>`).join("") || `<li>${t("colEmpty")}</li>`;
+  list.onclick = async (e) => {
+    const prev = e.target.closest("button[data-prev]");
+    if (prev) { setPreview(prev.dataset.prev); return; }
+    const rm = e.target.closest("button[data-col-rm]");
+    if (!rm) return;
+    const r = await api("/api/collections", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"remove", collection: LIB_COL_ID, rel: rm.dataset.colRm }),
+    });
+    if (r.collections) LIB_COLLECTIONS = { collections: r.collections };
+    else if (r.ok) LIB_COLLECTIONS = r;
+    renderCollectionsUI();
+    toast(t("colRemove"));
+  };
 }
 
 function renderLibrary(lib) {
   const items = lib.renders || [];
-  $("libList").innerHTML = items.map(it => `
-    <li>
-      <div><div><strong>${it.name}</strong></div><div class="mono">${it.rel} · ${Math.round(it.size/1024)} KB</div></div>
-      <button class="btn ghost" data-prev="${it.rel}">Preview</button>
+  const chars = (SNAP?.characters?.mp4s || []).map(it => ({...it, _char: true}));
+  const merged = [...items];
+  chars.forEach(c => {
+    if (!merged.some(m => m.rel === c.rel)) merged.push({ name: c.name, rel: c.rel, size: c.size });
+  });
+  if (lib.collections) LIB_COLLECTIONS = lib.collections;
+  renderLibThumbs(merged);
+  renderCollectionsUI();
+  $("libList").innerHTML = merged.map(it => `
+    <li class="${LIB_SELECTED_REL===it.rel?"selected":""}">
+      <div><div><strong>${it.name}</strong></div><div class="mono">${it.rel} · ${Math.round((it.size||0)/1024)} KB</div></div>
+      <div class="mini">
+        <button class="btn ghost" data-sel="${it.rel}">Select</button>
+        <button class="btn ghost" data-prev="${it.rel}">Preview</button>
+        <button class="btn ghost" data-thumb="${it.rel}">${t("makeThumb")}</button>
+      </div>
     </li>`).join("") || `<li>${t("emptyLib")}</li>`;
-  $("libList").onclick = (e) => {
+  $("libList").onclick = async (e) => {
+    const sel = e.target.closest("button[data-sel]");
+    if (sel) {
+      LIB_SELECTED_REL = sel.dataset.sel;
+      renderLibrary(lib);
+      return;
+    }
     const b = e.target.closest("button[data-prev]");
-    if (b) { setPreview(b.dataset.prev); setTab("overview"); }
+    if (b) { setPreview(b.dataset.prev); return; }
+    const th = e.target.closest("button[data-thumb]");
+    if (!th) return;
+    const r = await api("/api/collections", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"ensure_thumb", rel: th.dataset.thumb }),
+    });
+    log($("libLog"), r);
+    if (r.ok) { toast(r.thumb_rel || "thumb"); refresh(); }
+    else toast(r.error || "thumb failed");
   };
+  const meta = $("charLibMeta");
+  if (meta) {
+    const n = (SNAP?.characters?.pngs || []).length;
+    const sheet = SNAP?.characters?.sheet_rel;
+    meta.textContent = sheet
+      ? (`characters: ${n} plates · ${sheet}`)
+      : (`characters: ${n} plates`);
+  }
 }
+$("libCollectionSelect")?.addEventListener("change", () => {
+  LIB_COL_ID = $("libCollectionSelect").value || "favorites";
+  renderCollectionsUI();
+});
+$("btnColCreate")?.addEventListener("click", async () => {
+  const name = ($("libNewCollection")?.value || "").trim();
+  if (!name) return;
+  const r = await api("/api/collections", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action:"create", name }),
+  });
+  LIB_COLLECTIONS = r;
+  LIB_COL_ID = Object.keys(r.collections || {}).find(k => (r.collections[k].label||k) === name || k === name.replace(/\W+/g,"_")) || LIB_COL_ID;
+  if ($("libNewCollection")) $("libNewCollection").value = "";
+  renderCollectionsUI();
+  toast(t("colCreate"));
+});
+$("btnColAdd")?.addEventListener("click", async () => {
+  if (!LIB_SELECTED_REL) return toast("select a render");
+  const r = await api("/api/collections", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action:"add", collection: LIB_COL_ID, rel: LIB_SELECTED_REL }),
+  });
+  if (r.collections) LIB_COLLECTIONS = { ok:true, collections: r.collections };
+  renderCollectionsUI();
+  toast(t("colAdd"));
+});
 
+let INBOX_SELECTED = null;
 function renderInbox(ib) {
+  const waiting = new Set(ib.waiting_approve || []);
+  const approved = new Set(ib.approved || []);
   $("inboxStats").innerHTML = `
     <div class="check"><span class="dot"></span> pending: <b>${ib.counts?.pending||0}</b></div>
+    <div class="check ok"><span class="dot"></span> approved: <b>${approved.size}</b></div>
+    <div class="check"><span class="dot"></span> waiting: <b>${waiting.size}</b></div>
     <div class="check ok"><span class="dot"></span> done: <b>${ib.counts?.done||0}</b></div>
     <div class="check bad"><span class="dot"></span> refuse: <b>${ib.counts?.refuse||0}</b></div>
-    <p class="mono sub">${ib.inbox||""}</p>`;
-  $("inboxPending").innerHTML = (ib.pending||[]).map(n => `<li><span class="mono">${n}</span></li>`).join("") || `<li>${t("emptyInbox")}</li>`;
+    <p class="mono sub">${ib.inbox||""}</p>
+    <p class="sub">${ib.approve_honesty || ""}</p>`;
+  $("inboxPending").innerHTML = (ib.pending||[]).map(n => {
+    const st = approved.has(n) ? "approved" : "waiting";
+    return `<li data-inbox="${n}" class="${INBOX_SELECTED===n?"selected":""}"><span class="mono">${n}</span><span class="sub">${st}</span></li>`;
+  }).join("") || `<li>${t("emptyInbox")}</li>`;
+  $("inboxPending").onclick = (e) => {
+    const li = e.target.closest("[data-inbox]");
+    if (!li) return;
+    INBOX_SELECTED = li.dataset.inbox;
+    document.querySelectorAll("#inboxPending li").forEach(x => x.classList.toggle("selected", x.dataset.inbox === INBOX_SELECTED));
+  };
 }
 
 async function refresh() {
@@ -1624,24 +1944,118 @@ $("btnScript").onclick = async () => {
   $("scriptOut").value = JSON.stringify(r.script, null, 2);
   $("btnRunScript").disabled = false;
   log($("studioLog"), { path: r.path, source: r.source, scenes: r.scenes });
+  renderCutDesk(LAST_SCRIPT);
 };
+async function renderCutDesk(script) {
+  const list = $("cutList");
+  if (!list || !script) return;
+  const r = await api("/api/cut", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action: "lines", script }),
+  });
+  const lines = r.lines || [];
+  list.innerHTML = lines.map(ln =>
+    `<li><label class="check"><input type="checkbox" data-cut-idx="${ln.index}" checked/> <span><strong>${ln.id}</strong> · ${String(ln.text||"").slice(0,80)}</span></label></li>`
+  ).join("") || `<li>${t("emptyInbox")}</li>`;
+}
+$("btnLoadCut")?.addEventListener("click", async () => {
+  let script = LAST_SCRIPT;
+  if (!script) {
+    try { script = JSON.parse($("scriptOut").value || "{}"); } catch (e) { return alert("JSON"); }
+  }
+  if (!script || !script.scenes) return alert(t("btnScript"));
+  LAST_SCRIPT = script;
+  await renderCutDesk(script);
+  toast(t("btnLoadCut"));
+});
+$("btnApplyCut")?.addEventListener("click", async () => {
+  let script = LAST_SCRIPT;
+  if (!script) {
+    try { script = JSON.parse($("scriptOut").value || "{}"); } catch (e) { return alert("JSON"); }
+  }
+  const keep = [...document.querySelectorAll("#cutList input[data-cut-idx]:checked")].map(el => Number(el.dataset.cutIdx));
+  const r = await api("/api/cut", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ action: "apply", script, keep_indices: keep }),
+  });
+  log($("studioLog"), r);
+  if (r.ok && r.script) {
+    LAST_SCRIPT = r.script;
+    $("scriptOut").value = JSON.stringify(r.script, null, 2);
+    $("btnRunScript").disabled = false;
+    await renderCutDesk(r.script);
+    toast(t("btnApplyCut") + " · kept " + r.kept);
+  } else toast(r.error || "cut failed");
+});
 $("btnRunScript").onclick = async () => {
   if (!LAST_SCRIPT) return;
   const r = await api("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ script: LAST_SCRIPT, offline_tts: $("offlineTts").checked }) });
   await pollJob(r.job_id, $("studioLog"));
 };
+let HOOK_PACK = "curiosity";
+let HOOK_PACKS = null;
+function renderHookPackGrid() {
+  const grid = $("hookPackGrid");
+  if (!grid) return;
+  const packs = (HOOK_PACKS && HOOK_PACKS.packs) || {};
+  grid.innerHTML = Object.entries(packs).map(([k, v]) =>
+    `<button type="button" class="choice ${k===HOOK_PACK?"on":""}" data-hpack="${k}"><strong>${v.label||k}</strong><span class="sub">${v.note||""}</span></button>`
+  ).join("") || `<span class="sub">—</span>`;
+}
+$("hookPackGrid")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-hpack]");
+  if (!b) return;
+  HOOK_PACK = b.dataset.hpack;
+  document.querySelectorAll("#hookPackGrid .choice").forEach(el => el.classList.toggle("on", el.dataset.hpack === HOOK_PACK));
+});
+async function loadHookPacks() {
+  const r = await api("/api/hook-packs");
+  HOOK_PACKS = r;
+  renderHookPackGrid();
+  if ($("hookPackLog") && r.honesty) log($("hookPackLog"), { honesty: r.honesty });
+}
+$("btnPreviewHook")?.addEventListener("click", async () => {
+  const topic = ($("topic")?.value || "").trim() || "fail-closed";
+  const r = await api("/api/hook-packs", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ topic, pack: HOOK_PACK, language: $("lang")?.value || LANG || "ru" }),
+  });
+  log($("hookPackLog"), r);
+  if (r.ok) toast((r.hook || "").slice(0, 48));
+});
+$("btnApplyHookPack")?.addEventListener("click", async () => {
+  const topic = ($("topic")?.value || "").trim();
+  if (!topic) return alert(t("topic"));
+  const r = await api("/api/hook-packs", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      topic, pack: HOOK_PACK, language: $("lang")?.value || LANG || "ru", apply_script: true,
+    }),
+  });
+  log($("hookPackLog"), r);
+  if (r.ok && r.script) {
+    $("scriptOut").value = JSON.stringify(r.script, null, 2);
+    setTab("studio");
+    setWb("compose");
+    toast(t("applyHookPack"));
+  } else {
+    toast(r.error || "pack failed");
+  }
+});
+
 $("btnIdeas").onclick = async () => {
   const r = await api("/api/ideas", { method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({ language: $("lang").value, offline: true }) });
   const ideas = r.ideas || [];
+  if (r.hook_packs) { HOOK_PACKS = r.hook_packs; renderHookPackGrid(); }
   $("ideasList").innerHTML = ideas.slice(0,8).map(it => {
     const topic = it.topic || it;
     return `<li><span>${topic}</span><button class="btn ghost" data-topic="${String(topic).replace(/"/g,'&quot;')}">${t("useTopic")}</button></li>`;
   }).join("") || `<li>${t("emptyInbox")}</li>`;
   $("ideasList").onclick = (e) => {
     const b = e.target.closest("button[data-topic]");
-    if (b) { $("topic").value = b.dataset.topic; setTab("studio"); }
+    if (b) { $("topic").value = b.dataset.topic; setTab("studio"); setWb("compose"); }
   };
   log($("studioLog"), { honesty: r.honesty || "ideas ≠ virality", count: ideas.length });
 };
@@ -1655,10 +2069,25 @@ $("btnInboxSave").onclick = async () => {
   try { await saveInbox(JSON.parse($("inboxPaste").value)); }
   catch (e) { alert("JSON: " + e.message); }
 };
+$("btnInboxApprove")?.addEventListener("click", async () => {
+  if (!INBOX_SELECTED) return toast("select pending script");
+  const r = await api("/api/inbox/approve", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ name: INBOX_SELECTED }),
+  });
+  log($("queueLog"), r);
+  if (r.ok) { toast(t("btnApprove")); await refresh(); }
+  else toast(r.error || "approve failed");
+});
 $("btnInboxRun").onclick = async () => {
   const r = await api("/api/inbox/process", { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ offline_tts: $("offlineTts").checked, limit: 5 }) });
+    body: JSON.stringify({
+      offline_tts: $("offlineTts").checked,
+      limit: 5,
+      require_approve: !!$("inboxRequireApprove")?.checked,
+    }) });
   await pollJob(r.job_id, $("queueLog"));
+  await refresh();
 };
 $("btnInboxFixture").onclick = async () => {
   const r = await api("/api/inbox/fixture", { method:"POST", headers:{"Content-Type":"application/json"},
@@ -1754,7 +2183,7 @@ function renderTimeline() {
     <li data-ti="${i}" class="${TL_INDEX===i?"selected":""}">
       <div>
         <div><strong>${i+1}. ${c.name || c.rel}</strong></div>
-        <div class="mono">start=${c.start_sec||0}s${c.duration_sec!=null?" · dur="+c.duration_sec+"s":""}</div>
+        <div class="mono">start=${c.start_sec||0}s${c.duration_sec!=null?" · dur="+c.duration_sec+"s":""}${(c.fade_in||c.fade_out||(c.zoom&&c.zoom>1))?" · kf":""}</div>
       </div>
       <div class="mini">
         <button class="btn ghost" data-up="${i}" title="Move up">${t("moveUp")}</button>
@@ -1764,11 +2193,64 @@ function renderTimeline() {
       </div>
     </li>`).join("") || `<li>${t("emptyTl")}</li>`;
   setDirty(DIRTY);
+  if (TL_INDEX != null && TIMELINE[TL_INDEX]) {
+    const c = TIMELINE[TL_INDEX];
+    if ($("kfFadeIn")) $("kfFadeIn").value = c.fade_in || 0;
+    if ($("kfFadeOut")) $("kfFadeOut").value = c.fade_out || 0;
+    if ($("kfZoom")) $("kfZoom").value = c.zoom || 1;
+  }
 }
+$("btnApplyKf")?.addEventListener("click", () => {
+  if (TL_INDEX == null || !TIMELINE[TL_INDEX]) return toast("select timeline clip");
+  pushUndo();
+  const c = { ...TIMELINE[TL_INDEX] };
+  c.fade_in = Math.max(0, parseFloat($("kfFadeIn")?.value || "0") || 0);
+  c.fade_out = Math.max(0, parseFloat($("kfFadeOut")?.value || "0") || 0);
+  c.zoom = Math.max(1, Math.min(1.25, parseFloat($("kfZoom")?.value || "1") || 1));
+  TIMELINE[TL_INDEX] = c;
+  renderTimeline();
+  setDirty(true);
+  toast(t("btnApplyKf"));
+});
+function renderTransGrid() {
+  const grid = $("transGrid");
+  if (!grid) return;
+  const pack = (TRANSITIONS_CAT && TRANSITIONS_CAT.transitions) || {
+    cut: {label:"Cut", label_ru:"Резко"},
+    fade: {label:"Fade", label_ru:"Затухание"},
+    dissolve: {label:"Dissolve", label_ru:"Наплыв"},
+  };
+  grid.innerHTML = Object.entries(pack).map(([k,v]) =>
+    `<button type="button" class="choice ${k===TRANSITION?"on":""}" data-trans="${k}"><strong>${LANG==="ru"?(v.label_ru||v.label):v.label}</strong><span class="sub">${v.note||""}</span></button>`
+  ).join("");
+}
+$("transGrid")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-trans]");
+  if (!b) return;
+  TRANSITION = b.dataset.trans;
+  document.querySelectorAll("#transGrid .choice").forEach(el => el.classList.toggle("on", el.dataset.trans === TRANSITION));
+  setDirty(true);
+});
+$("transDur")?.addEventListener("change", () => {
+  const v = parseFloat($("transDur").value);
+  if (!Number.isNaN(v)) TRANSITION_SEC = Math.max(0.15, Math.min(1.2, v));
+  setDirty(true);
+});
+
 async function loadMedia() {
   const r = await api("/api/media/list");
   MEDIA = r.items || [];
   if (!DIRTY) TIMELINE = (r.timeline && r.timeline.clips) || TIMELINE;
+  const tlFull = await api("/api/timeline");
+  if (tlFull && tlFull.transitions) TRANSITIONS_CAT = tlFull.transitions;
+  if (!DIRTY && tlFull) {
+    if (tlFull.timeline && tlFull.timeline.transition) TRANSITION = tlFull.timeline.transition;
+    else if (tlFull.montage_prefs && tlFull.montage_prefs.transition) TRANSITION = tlFull.montage_prefs.transition;
+    if (tlFull.timeline && tlFull.timeline.transition_sec != null) TRANSITION_SEC = Number(tlFull.timeline.transition_sec);
+    else if (tlFull.montage_prefs && tlFull.montage_prefs.transition_sec != null) TRANSITION_SEC = Number(tlFull.montage_prefs.transition_sec);
+  }
+  if ($("transDur")) $("transDur").value = String(TRANSITION_SEC);
+  renderTransGrid();
   renderMediaList();
   renderTimeline();
 }
@@ -1777,7 +2259,10 @@ async function persistTimeline({quiet=false} = {}) {
   const r = await api("/api/project/save", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ clips: TIMELINE, meta: { lang: LANG } }),
+    body: JSON.stringify({
+      clips: TIMELINE,
+      meta: { lang: LANG, transition: TRANSITION, transition_sec: TRANSITION_SEC },
+    }),
   });
   setDirty(false);
   renderTimeline();
@@ -1795,7 +2280,8 @@ $("btnExportMontage").onclick = async () => {
   const needRender = (x) => !x.ok && /stitch|Склеить|render timeline/i.test(String(x.error||x.next||""));
   if (needRender(r)) {
     const job = await api("/api/timeline/render", {
-      method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ transition: TRANSITION, transition_sec: TRANSITION_SEC }),
     });
     await pollJob(job.job_id, $("montageLog"));
     r = await api("/api/montage/export", {
@@ -2050,12 +2536,13 @@ $("btnImgClip").onclick = async () => {
 $("btnRenderTl").onclick = async () => {
   await persistTimeline({quiet:true});
   const r = await api("/api/timeline/render", {
-    method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ transition: TRANSITION, transition_sec: TRANSITION_SEC }),
   });
   const result = await pollJob(r.job_id, $("montageLog"));
   if (result && result.latest_rel) {
     $("montagePreview").src = mediaUrl(result.latest_rel);
-    setPreview(result.latest_rel, "montage stitch");
+    setPreview(result.latest_rel, "montage stitch · " + (result.transition || TRANSITION));
   }
   await loadMedia();
 };
@@ -2093,7 +2580,12 @@ function renderRecentThumbs() {
   const items = (SNAP?.library?.renders || []).slice(0, 8);
   const el = $("recentThumbs");
   if (!el) return;
-  el.innerHTML = items.map(it => `<button type="button" data-prev="${it.rel}"><div class="t">${it.name}</div><div class="s">${Math.round((it.size||0)/1024)}KB</div></button>`).join("") || `<span class="sub">${t("emptyLib")}</span>`;
+  el.innerHTML = items.map(it => {
+    const thumb = it.thumb_rel
+      ? `<img src="${mediaUrl(it.thumb_rel)}" alt="" style="width:100%;height:64px;object-fit:cover;border-radius:8px;display:block"/>`
+      : "";
+    return `<button type="button" data-prev="${it.rel}">${thumb}<div class="t">${it.name}</div><div class="s">${Math.round((it.size||0)/1024)}KB</div></button>`;
+  }).join("") || `<span class="sub">${t("emptyLib")}</span>`;
   el.onclick = (e) => {
     const b = e.target.closest("button[data-prev]");
     if (!b) return;
@@ -2205,6 +2697,7 @@ if (cs) cs.onclick = async () => {
 // --- Character kit + procedural 3D / optional GLB ---
 let CHAR = null;
 let charStyle = "cartoon";
+let charLayout = "pip";
 let charSelectedGlb = null;
 let char3d = { renderer: null, scene: null, camera: null, mesh: null, root: null, raf: 0, mode: "none" };
 
@@ -2231,8 +2724,10 @@ async function loadCharacters() {
   CHAR = await api("/api/characters");
   const prefs = CHAR.prefs || {};
   charStyle = prefs.default_style || "cartoon";
+  charLayout = prefs.layout === "full" ? "full" : "pip";
   charSelectedGlb = prefs.selected_glb || null;
   if ($("charEnabled")) $("charEnabled").checked = prefs.enabled !== false;
+  if ($("charLipAnimate")) $("charLipAnimate").checked = prefs.lip_animate !== false;
   const grid = $("charStyleGrid");
   if (grid) {
     const styles = CHAR.styles || {};
@@ -2240,6 +2735,9 @@ async function loadCharacters() {
       `<button type="button" class="choice ${k===charStyle?"on":""}" data-cstyle="${k}"><strong>${LANG==="ru"?(v.label_ru||v.label):v.label}</strong><span class="sub">${v.note||""}</span></button>`
     ).join("");
   }
+  document.querySelectorAll("#charLayoutGrid .choice").forEach(el =>
+    el.classList.toggle("on", el.dataset.clayout === charLayout)
+  );
   const sel = $("charGlbSelect");
   if (sel) {
     const glbs = CHAR.glb_avatars || [];
@@ -2260,7 +2758,11 @@ async function loadCharacters() {
       `<button type="button" class="pill ${LANG==="ru"?"cyan":"indigo"}" data-roster="${k}">${LANG==="ru"?(v.label_ru||v.label):v.label}</button>`
     ).join("");
   }
-  if ($("charLog")) log($("charLog"), { honesty: CHAR.honesty, style: charStyle, glb: charSelectedGlb || "procedural", viseme: CHAR.viseme_note });
+  if ($("charLog")) log($("charLog"), {
+    honesty: CHAR.honesty, style: charStyle, layout: charLayout,
+    lip_animate: prefs.lip_animate !== false,
+    glb: charSelectedGlb || "procedural", viseme: CHAR.viseme_note,
+  });
   initCharPreview();
 }
 
@@ -2270,6 +2772,15 @@ $("charStyleGrid")?.addEventListener("click", (e) => {
   charStyle = b.dataset.cstyle;
   document.querySelectorAll("#charStyleGrid .choice").forEach(el => el.classList.toggle("on", el.dataset.cstyle === charStyle));
   applyCharLook();
+});
+
+$("charLayoutGrid")?.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-clayout]");
+  if (!b) return;
+  charLayout = b.dataset.clayout === "full" ? "full" : "pip";
+  document.querySelectorAll("#charLayoutGrid .choice").forEach(el =>
+    el.classList.toggle("on", el.dataset.clayout === charLayout)
+  );
 });
 
 $("charGlbSelect")?.addEventListener("change", async () => {
@@ -2289,6 +2800,8 @@ if (btnSaveChars) btnSaveChars.onclick = async () => {
     body: JSON.stringify({
       default_style: charStyle,
       enabled: !!$("charEnabled")?.checked,
+      layout: charLayout,
+      lip_animate: !!$("charLipAnimate")?.checked,
       selected_glb: charSelectedGlb || "procedural",
     }),
   });
@@ -2306,10 +2819,32 @@ if (btnCharPlate) btnCharPlate.onclick = async () => {
       style: charStyle,
       speaker: $("charSpeaker")?.value || "Hero",
       emotion: $("charEmotion")?.value || "neutral",
+      layout: charLayout,
     }),
   });
   log($("charLog"), r);
   if (r.rel) toast(r.rel);
+};
+const btnCharTalk = $("btnCharTalk");
+if (btnCharTalk) btnCharTalk.onclick = async () => {
+  toast(t("charTalk") + "…");
+  const r = await api("/api/characters", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "talking_clip",
+      text: $("charLine")?.value || "Привет!",
+      style: charStyle,
+      speaker: $("charSpeaker")?.value || "Hero",
+      emotion: $("charEmotion")?.value || "neutral",
+      layout: charLayout,
+      language: LANG || "ru",
+      allow_network_tts: false,
+      with_audio: true,
+    }),
+  });
+  log($("charLog"), r);
+  if (r.ok && r.rel) toast(r.rel);
+  else toast(r.error || "talk failed");
 };
 
 let charSpeakTimer = null;
@@ -2473,6 +3008,12 @@ if (btnCastReel) btnCastReel.onclick = async () => {
     toast(r.error || "cast reel failed");
   }
 };
+const btnOpenSheet = $("btnOpenSheet");
+if (btnOpenSheet) btnOpenSheet.onclick = () => openPath("cast_sheet");
+const btnOpenChars = $("btnOpenChars");
+if (btnOpenChars) btnOpenChars.onclick = () => openPath("characters");
+const btnOpenChars2 = $("btnOpenChars2");
+if (btnOpenChars2) btnOpenChars2.onclick = () => openPath("characters");
 
 ["charSpeaker","charEmotion"].forEach(id => {
   const el = $(id);
@@ -2645,7 +3186,7 @@ async function initCharPreview() {
 }
 
 
-Promise.all([refresh(), loadStudio(), loadMedia(), loadCharacters()]).catch(e => { $("jobsLog").textContent = String(e); });
+Promise.all([refresh(), loadStudio(), loadMedia(), loadCharacters(), loadHookPacks()]).catch(e => { $("jobsLog").textContent = String(e); });
 </script>
 </body>
 </html>

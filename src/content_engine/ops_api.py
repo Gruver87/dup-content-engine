@@ -62,19 +62,34 @@ def doctor_info() -> dict[str, Any]:
         "library": str(PACKAGE_ROOT / "assets" / "library"),
         "avatars": str(PACKAGE_ROOT / "assets" / "avatars"),
         "honesty": "ALLOW ≠ growth; official APIs only — no cookie bots",
-        "keys_present": {
-            "tiktok": bool(os.environ.get("TIKTOK_CLIENT_KEY") and os.environ.get("TIKTOK_CLIENT_SECRET")),
-            "elevenlabs": bool(os.environ.get("ELEVENLABS_API_KEY")),
-            "pexels": bool(os.environ.get("PEXELS_API_KEY")),
-        },
+        "keys_present": _keys_presence(),
+    }
+
+
+def _keys_presence() -> dict[str, bool]:
+    """Boolean presence only — never return secret values."""
+    yt_secrets = Path(
+        os.environ.get("YOUTUBE_CLIENT_SECRETS") or str(PACKAGE_ROOT / "client_secrets.json")
+    )
+    yt_token = Path(os.environ.get("YOUTUBE_TOKEN") or str(PACKAGE_ROOT / "token.json"))
+    return {
+        "tiktok_client": bool(
+            os.environ.get("TIKTOK_CLIENT_KEY") and os.environ.get("TIKTOK_CLIENT_SECRET")
+        ),
+        "tiktok_access": bool(os.environ.get("TIKTOK_ACCESS_TOKEN")),
+        "youtube_secrets": yt_secrets.is_file(),
+        "youtube_token": yt_token.is_file(),
+        "instagram": bool(os.environ.get("IG_USER_ID") and os.environ.get("IG_ACCESS_TOKEN")),
+        "elevenlabs": bool(os.environ.get("ELEVENLABS_API_KEY")),
+        "pexels": bool(os.environ.get("PEXELS_API_KEY")),
     }
 
 
 def action_open_path(which: str) -> dict[str, Any]:
-    """Open a known package folder in the OS file manager (localhost console only)."""
+    """Open a known package folder/file in the OS file manager (localhost console only)."""
     from content_engine.inbox import DEFAULT_INBOX as _inbox
 
-    mapping = {
+    mapping: dict[str, Path] = {
         "root": PACKAGE_ROOT,
         "out": PACKAGE_ROOT / "out",
         "assets": PACKAGE_ROOT / "assets",
@@ -85,13 +100,26 @@ def action_open_path(which: str) -> dict[str, Any]:
         "fixtures": PACKAGE_ROOT / "fixtures",
         "avatars": PACKAGE_ROOT / "assets" / "avatars",
         "characters": PACKAGE_ROOT / "out" / "characters",
+        "cast_sheet": PACKAGE_ROOT / "out" / "characters" / "cast" / "CAST_SHEET.html",
+        "cast_reel": PACKAGE_ROOT / "out" / "characters" / "cast" / "cast_reel.mp4",
+        "calendar": PACKAGE_ROOT / "out" / "calendar",
+        "schedule": PACKAGE_ROOT / "out" / "calendar" / "SCHEDULE.json",
     }
     key = (which or "").strip().lower()
     target = mapping.get(key)
     if target is None:
         return {"ok": False, "error": f"unknown path key: {which}", "allowed": sorted(mapping)}
-    target.mkdir(parents=True, exist_ok=True)
-    path = str(target.resolve())
+    if key == "cast_sheet" and not target.is_file():
+        from content_engine.character_kit import build_cast_sheet
+
+        build_cast_sheet()
+    if key in {"cast_sheet", "cast_reel"}:
+        if not target.is_file():
+            return {"ok": False, "error": f"missing {target.name} — run Cast reel / Export cast plates first", "path": str(target)}
+        path = str(target.resolve())
+    else:
+        target.mkdir(parents=True, exist_ok=True)
+        path = str(target.resolve())
     try:
         if os.name == "nt":
             os.startfile(path)  # type: ignore[attr-defined]
@@ -147,10 +175,64 @@ def list_library(*, limit: int = 40) -> dict[str, Any]:
     if fix.is_dir():
         for p in sorted(fix.glob("*.json")):
             fixtures.append({"path": str(p), "name": p.name})
-    return {"ok": True, "renders": items, "scripts": scripts, "fixtures": fixtures}
+    from content_engine.collections import catalog as collections_catalog
+
+    return {
+        "ok": True,
+        "renders": items,
+        "scripts": scripts,
+        "fixtures": fixtures,
+        "collections": collections_catalog(),
+    }
+
+
+def action_collections(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.collections import (
+        add_item,
+        catalog,
+        delete_collection,
+        ensure_collection,
+        remove_item,
+    )
+
+    body = body or {}
+    action = str(body.get("action") or "catalog").lower()
+    if action in {"catalog", "list", ""}:
+        return catalog()
+    if action in {"ensure", "create"}:
+        return ensure_collection(str(body.get("name") or body.get("id") or ""), label=body.get("label"))
+    if action == "add":
+        return add_item(str(body.get("collection") or body.get("id") or "favorites"), str(body.get("rel") or ""))
+    if action == "remove":
+        return remove_item(
+            str(body.get("collection") or body.get("id") or "favorites"),
+            str(body.get("rel") or ""),
+        )
+    if action == "delete":
+        return delete_collection(str(body.get("collection") or body.get("id") or ""))
+    if action == "ensure_thumb":
+        from content_engine.thumbnail import make_thumbnail
+
+        rel = str(body.get("rel") or "").replace("\\", "/").lstrip("/")
+        mp4 = PACKAGE_ROOT / rel
+        if not mp4.is_file() or mp4.suffix.lower() != ".mp4":
+            return {"ok": False, "error": "mp4 rel required"}
+        out = mp4.with_suffix(".thumb.jpg")
+        try:
+            make_thumbnail(mp4, out, title=str(body.get("title") or mp4.stem))
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)[:240]}
+        return {
+            "ok": out.is_file(),
+            "rel": rel,
+            "thumb_rel": str(out.relative_to(PACKAGE_ROOT)).replace("\\", "/"),
+        }
+    return {"ok": False, "error": f"unknown action: {action}"}
 
 
 def list_inbox() -> dict[str, Any]:
+    from content_engine.inbox import list_approve_state
+
     root = DEFAULT_INBOX
     root.mkdir(parents=True, exist_ok=True)
     pending = sorted([p.name for p in root.glob("*.json") if p.is_file()])
@@ -160,6 +242,7 @@ def list_inbox() -> dict[str, Any]:
         if (root / "refuse").is_dir()
         else []
     )
+    approve = list_approve_state(inbox_dir=root)
     return {
         "ok": True,
         "inbox": str(root),
@@ -167,10 +250,15 @@ def list_inbox() -> dict[str, Any]:
         "done": done[-20:],
         "refuse": refuse[-20:],
         "counts": {"pending": len(pending), "done": len(done), "refuse": len(refuse)},
+        "approved": approve.get("approved") or [],
+        "waiting_approve": approve.get("waiting_approve") or [],
+        "approve_honesty": approve.get("honesty"),
     }
 
 
 def snapshot() -> dict[str, Any]:
+    from content_engine.character_kit import list_character_artifacts
+
     st = build_status()
     return {
         "ok": True,
@@ -178,6 +266,7 @@ def snapshot() -> dict[str, Any]:
         "status": st,
         "doctor": doctor_info(),
         "library": list_library(limit=12),
+        "characters": list_character_artifacts(limit=12),
         "inbox": list_inbox(),
         "jobs_tail": read_jobs(limit=12),
         "honesty": st.get("honesty"),
@@ -343,11 +432,55 @@ def action_write_script(*, topic: str, language: str = "ru", offline: bool = Tru
     }
 
 
-def action_process_inbox(*, offline_tts: bool = False, limit: int | None = 5) -> str:
+def action_process_inbox(
+    *,
+    offline_tts: bool = False,
+    limit: int | None = 5,
+    require_approve: bool = False,
+) -> str:
     def _fn() -> dict[str, Any]:
-        return process_inbox(offline_tts=offline_tts, limit=limit, finish=True)
+        return process_inbox(
+            offline_tts=offline_tts,
+            limit=limit,
+            finish=True,
+            require_approve=require_approve,
+        )
 
     return start_background("inbox", _fn)
+
+
+def action_inbox_approve(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.inbox import approve_script, list_approve_state
+
+    body = body or {}
+    name = str(body.get("name") or body.get("script") or "")
+    if name:
+        return approve_script(name)
+    return list_approve_state()
+
+
+def action_transcript_cut(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.models import Script
+    from content_engine.transcript_cut import apply_cut, script_lines
+
+    body = body or {}
+    raw = body.get("script")
+    if isinstance(raw, str):
+        raw = json.loads(raw)
+    if not isinstance(raw, dict):
+        return {"ok": False, "error": "script object required"}
+    script = Script.from_dict(raw)
+    action = str(body.get("action") or "lines").lower()
+    if action in {"lines", "preview", "catalog", ""}:
+        return script_lines(script)
+    if action in {"apply", "cut"}:
+        return apply_cut(
+            script,
+            keep_indices=body.get("keep_indices"),
+            drop_indices=body.get("drop_indices"),
+            keep_ids=body.get("keep_ids"),
+        )
+    return {"ok": False, "error": f"unknown action: {action}"}
 
 
 def action_ready() -> dict[str, Any]:
@@ -365,10 +498,85 @@ def action_finish() -> dict[str, Any]:
     return {"ok": True, "finish": finish_allow_run(mp4, pack), "ready": ready}
 
 
+def action_schedule(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Local calendar / multi-platform schedule — plan only, never auto-posts."""
+    from content_engine.calendar import build_multi_schedule, load_schedule
+
+    body = body or {}
+    action = str(body.get("action") or "load").lower()
+    if action in {"load", "get", "catalog", ""}:
+        return load_schedule()
+    if action in {"build", "create"}:
+        topics = body.get("topics") or str(PACKAGE_ROOT / "topics.ru.example.txt")
+        topics_path = Path(str(topics))
+        if not topics_path.is_file():
+            alt = PACKAGE_ROOT / str(topics)
+            topics_path = alt if alt.is_file() else PACKAGE_ROOT / "topics.example.txt"
+        if not topics_path.is_file():
+            return {"ok": False, "error": f"topics file missing: {topics_path}"}
+        return build_multi_schedule(
+            topics_path,
+            start_date=str(body["start_date"]) if body.get("start_date") else None,
+            per_day=int(body.get("per_day") or 1),
+            gap_hours=float(body.get("gap_hours") or 6.0),
+            platform_gap_hours=float(body.get("platform_gap_hours") or 1.0),
+            platforms=body.get("platforms"),
+        )
+    return {"ok": False, "error": f"unknown action: {action}"}
+
+
 def action_ideas(*, language: str = "ru", offline: bool = True) -> dict[str, Any]:
+    from content_engine.hook_packs import catalog as hook_pack_catalog
     from content_engine.trends import suggest_ideas
 
-    return suggest_ideas(language=language, online=not offline, limit=8)
+    ideas = suggest_ideas(language=language, online=not offline, limit=8)
+    packs = hook_pack_catalog(language=language)
+    if isinstance(ideas, dict):
+        return {**ideas, "hook_packs": packs}
+    return {"ok": True, "ideas": ideas, "hook_packs": packs}
+
+
+def action_hook_packs(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.hook_packs import apply_to_script, catalog, render_pack
+    from content_engine.models import Script
+
+    body = body or {}
+    language = str(body.get("language") or "ru")
+    if body.get("action") in {None, "", "catalog"} and not body.get("topic") and not body.get("script"):
+        return catalog(language=language)
+    if body.get("script"):
+        raw = body["script"]
+        if isinstance(raw, str):
+            import json
+
+            raw = json.loads(raw)
+        script = Script.from_dict(raw) if isinstance(raw, dict) else None
+        if script is None:
+            return {"ok": False, "error": "script object required"}
+        return apply_to_script(
+            script,
+            pack_id=str(body.get("pack") or body.get("pack_id") or "curiosity"),
+            language=language,
+        )
+    topic = str(body.get("topic") or "").strip()
+    if not topic:
+        return {**catalog(language=language), "error": "topic or script required for apply"}
+    rendered = render_pack(
+        topic=topic,
+        pack_id=str(body.get("pack") or body.get("pack_id") or "curiosity"),
+        language=language,
+    )
+    if body.get("apply_script"):
+        # optional: generate offline script then apply pack
+        from content_engine.script_writer import offline_topic_script
+
+        base = offline_topic_script(topic, language=language)
+        return apply_to_script(
+            base,
+            pack_id=str(body.get("pack") or body.get("pack_id") or "curiosity"),
+            language=language,
+        )
+    return rendered
 
 
 def action_export() -> dict[str, Any]:
@@ -510,6 +718,21 @@ def action_characters_prefs(patch: dict[str, Any] | None = None) -> dict[str, An
             style=str(patch.get("style") or "cartoon"),
             speaker=str(patch.get("speaker") or "Hero"),
             emotion=str(patch.get("emotion") or "neutral"),
+            layout=str(patch["layout"]) if patch.get("layout") else None,
+        )
+    if patch and patch.get("action") == "talking_clip":
+        from content_engine.character_kit import preview_talking_clip
+
+        return preview_talking_clip(
+            text=str(patch.get("text") or ""),
+            style=str(patch.get("style") or "cartoon"),
+            speaker=str(patch.get("speaker") or "Hero"),
+            emotion=str(patch.get("emotion") or "neutral"),
+            gender=str(patch["gender"]) if patch.get("gender") else None,
+            layout=str(patch["layout"]) if patch.get("layout") else None,
+            language=str(patch.get("language") or "ru"),
+            allow_network_tts=bool(patch.get("allow_network_tts", False)),
+            with_audio=bool(patch.get("with_audio", True)),
         )
     if patch and patch.get("action") == "cast_plates":
         from content_engine.character_kit import build_cast_sheet, export_cast_plates
@@ -643,6 +866,8 @@ def action_media_concat(body: dict[str, Any]) -> dict[str, Any]:
         out,
         width=int(body.get("width") or 1080),
         height=int(body.get("height") or 1920),
+        transition=str(body["transition"]) if body.get("transition") else None,
+        transition_sec=float(body["transition_sec"]) if body.get("transition_sec") is not None else None,
     )
 
 
@@ -663,9 +888,24 @@ def action_media_image_clip(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_timeline_get() -> dict[str, Any]:
-    from content_engine.montage import load_timeline
+    from content_engine.montage import list_transitions, load_montage_prefs, load_timeline
 
-    return {"ok": True, "timeline": load_timeline()}
+    tl = load_timeline()
+    prefs = load_montage_prefs()
+    return {
+        "ok": True,
+        "timeline": tl,
+        "transitions": list_transitions(),
+        "montage_prefs": prefs,
+    }
+
+
+def action_montage_prefs(patch: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.montage import list_transitions, load_montage_prefs, save_montage_prefs
+
+    if patch:
+        return {**save_montage_prefs(patch), "transitions": list_transitions()}
+    return {"ok": True, "prefs": load_montage_prefs(), "transitions": list_transitions()}
 
 
 def action_timeline_save(body: dict[str, Any]) -> dict[str, Any]:
@@ -676,7 +916,11 @@ def action_timeline_save(body: dict[str, Any]) -> dict[str, Any]:
     clips = body.get("clips")
     if not isinstance(clips, list):
         return {"ok": False, "error": "clips[] required"}
-    return save_timeline(clips)
+    return save_timeline(
+        clips,
+        transition=str(body["transition"]) if body.get("transition") else None,
+        transition_sec=float(body["transition_sec"]) if body.get("transition_sec") is not None else None,
+    )
 
 
 def action_media_delete(body: dict[str, Any]) -> dict[str, Any]:
@@ -695,6 +939,8 @@ def action_timeline_render(body: dict[str, Any] | None = None) -> str:
             width=int(body.get("width") or 1080),
             height=int(body.get("height") or 1920),
             fps=int(body.get("fps") or 30),
+            transition=str(body["transition"]) if body.get("transition") else None,
+            transition_sec=float(body["transition_sec"]) if body.get("transition_sec") is not None else None,
         )
 
     return start_background("montage_render", _fn)
