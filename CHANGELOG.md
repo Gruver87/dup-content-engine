@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.53 — 2026-11-18
+
+Batch (one ship):
+- More xfade: **slideup/down, rect/circle crop, squeeze H/V**
+- Clip **speed ramp**, **tint/sepia**, **HP/LP/pan**
+- Timeline **move to top** API
+- Check script `scripts/check_batch_053.ps1`
+
 ## 0.1.52 — 2026-11-18
 
 Batch (one ship):

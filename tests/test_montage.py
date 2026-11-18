@@ -11,6 +11,7 @@ from content_engine.montage import (
     apply_clip_look,
     apply_clip_loop,
     apply_clip_burn_srt,
+    apply_clip_audio_filter,
     apply_clip_edge_fade,
     apply_clip_flash,
     apply_clip_glow,
@@ -19,8 +20,11 @@ from content_engine.montage import (
     apply_clip_loudnorm,
     apply_clip_posterize,
     apply_clip_rgbshift,
+    apply_clip_speed_ramp,
+    apply_clip_tint,
     clear_timeline_fx,
     extract_clip_audio,
+    move_timeline_clip,
     apply_clip_mirror,
     apply_clip_opacity,
     apply_clip_overlay_text,
@@ -328,6 +332,30 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_ramp_tint_audio_move_xfade(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.2)
+    rr = apply_clip_speed_ramp(src, out / "ramp.mp4", speed_start=0.8, speed_end=1.3, fps=12)
+    assert rr["ok"] is True and Path(rr["path"]).is_file()
+    assert apply_clip_tint(src, out / "sep.mp4", tint="sepia", fps=12)["ok"]
+    af = apply_clip_audio_filter(src, out / "aq.mp4", highpass_hz=120, pan=-0.4, fps=12)
+    assert af["ok"] is True
+
+    pack = list_transitions()
+    for key in ("slideup", "rectcrop", "squeezeh"):
+        assert key in pack["transitions"]
+
+    save_timeline([{"name": "a"}, {"name": "b"}, {"name": "c"}])
+    mv = move_timeline_clip(from_index=2, to_index=0)
+    assert mv["ok"] and [c["name"] for c in mv["timeline"]["clips"]] == ["c", "a", "b"]
 
 
 def test_flash_posterize_rgb_edge_clear_extract(tmp_path, monkeypatch):

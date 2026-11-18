@@ -970,6 +970,30 @@ body {
             <label class="field"><span data-i18n="clipEdgeFade">Edge fade</span>
               <input id="clipEdgeFade" type="number" min="0" max="1" step="0.05" value="0" style="min-width:60px"/>
             </label>
+            <label class="field"><span data-i18n="clipSpeedStart">Ramp start</span>
+              <input id="clipSpeedStart" type="number" min="0.5" max="2" step="0.05" value="1" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipSpeedEnd">Ramp end</span>
+              <input id="clipSpeedEnd" type="number" min="0.5" max="2" step="0.05" value="1" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipTint">Tint</span>
+              <select id="clipTint" style="min-width:80px">
+                <option value="none" selected>none</option>
+                <option value="sepia">sepia</option>
+                <option value="warm">warm</option>
+                <option value="cool">cool</option>
+                <option value="teal">teal</option>
+              </select>
+            </label>
+            <label class="field"><span data-i18n="clipHighpass">HP Hz</span>
+              <input id="clipHighpass" type="number" min="0" max="800" step="10" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipLowpass">LP Hz</span>
+              <input id="clipLowpass" type="number" min="0" max="16000" step="100" value="0" style="min-width:70px"/>
+            </label>
+            <label class="field"><span data-i18n="clipPan">Pan</span>
+              <input id="clipPan" type="number" min="-1" max="1" step="0.1" value="0" style="min-width:60px"/>
+            </label>
             <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
           </div>
           <div class="row" style="margin-top:10px">
@@ -995,6 +1019,7 @@ body {
             <button class="btn ghost" id="btnShuffle" data-i18n="btnShuffle">Shuffle</button>
             <button class="btn ghost" id="btnTlStats" data-i18n="btnTlStats">Duration</button>
             <button class="btn ghost" id="btnClearFx" data-i18n="btnClearFx">Clear FX</button>
+            <button class="btn ghost" id="btnMoveTop" data-i18n="btnMoveTop">To top</button>
             <button class="btn ghost" id="btnExtractAudio" data-i18n="btnExtractAudio">Extract audio</button>
             <button class="btn ghost" id="btnThumb" data-i18n="btnThumb">Thumb</button>
             <button class="btn ghost" id="btnZip" data-i18n="btnZip">Zip pack</button>
@@ -1272,7 +1297,7 @@ const I18N = {
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Сброс FX", btnExtractAudio: "Извлечь audio", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Сброс FX", btnMoveTop: "В начало", btnExtractAudio: "Извлечь audio", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1434,7 +1459,7 @@ const I18N = {
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Clear FX", btnExtractAudio: "Extract audio", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Clear FX", btnMoveTop: "To top", btnExtractAudio: "Extract audio", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2397,6 +2422,12 @@ function renderTimeline() {
     if ($("clipPosterize")) $("clipPosterize").value = c.posterize || 0;
     if ($("clipRgbshift")) $("clipRgbshift").value = c.rgbshift || 0;
     if ($("clipEdgeFade")) $("clipEdgeFade").value = c.edge_fade || 0;
+    if ($("clipSpeedStart")) $("clipSpeedStart").value = c.speed_start != null ? c.speed_start : 1;
+    if ($("clipSpeedEnd")) $("clipSpeedEnd").value = c.speed_end != null ? c.speed_end : 1;
+    if ($("clipTint")) $("clipTint").value = c.tint || (c.sepia ? "sepia" : "none");
+    if ($("clipHighpass")) $("clipHighpass").value = c.highpass_hz || 0;
+    if ($("clipLowpass")) $("clipLowpass").value = c.lowpass_hz || 0;
+    if ($("clipPan")) $("clipPan").value = c.pan || 0;
   }
 }
 $("btnApplyKf")?.addEventListener("click", () => {
@@ -2444,6 +2475,13 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.posterize = Math.max(0, Math.min(14, parseInt($("clipPosterize")?.value || "0", 10) || 0));
   c.rgbshift = Math.max(0, Math.min(24, parseFloat($("clipRgbshift")?.value || "0") || 0));
   c.edge_fade = Math.max(0, Math.min(1, parseFloat($("clipEdgeFade")?.value || "0") || 0));
+  c.speed_start = Math.max(0.5, Math.min(2, parseFloat($("clipSpeedStart")?.value || "1") || 1));
+  c.speed_end = Math.max(0.5, Math.min(2, parseFloat($("clipSpeedEnd")?.value || "1") || 1));
+  c.tint = $("clipTint")?.value || "none";
+  c.sepia = c.tint === "sepia";
+  c.highpass_hz = Math.max(0, Math.min(800, parseFloat($("clipHighpass")?.value || "0") || 0));
+  c.lowpass_hz = Math.max(0, Math.min(16000, parseFloat($("clipLowpass")?.value || "0") || 0));
+  c.pan = Math.max(-1, Math.min(1, parseFloat($("clipPan")?.value || "0") || 0));
   TIMELINE[TL_INDEX] = c;
   renderTimeline();
   setDirty(true);
@@ -2779,6 +2817,22 @@ $("btnClearFx")?.addEventListener("click", async () => {
     setDirty(false);
     toast(t("btnClearFx"));
   } else toast((r && r.error) || "clear fx failed");
+});
+$("btnMoveTop")?.addEventListener("click", async () => {
+  if (TL_INDEX == null || TL_INDEX === 0) return toast("select clip ≠ first");
+  await persistTimeline({quiet:true});
+  const r = await api("/api/timeline/markers", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ action: "move", from_index: TL_INDEX, to_index: 0 }),
+  });
+  if (r.ok && r.timeline && r.timeline.clips) {
+    pushUndo();
+    TIMELINE = r.timeline.clips;
+    TL_INDEX = 0;
+    renderTimeline();
+    setDirty(false);
+    toast(t("btnMoveTop"));
+  } else toast((r && r.error) || "move failed");
 });
 $("btnExtractAudio")?.addEventListener("click", async () => {
   await persistTimeline({quiet:true});

@@ -51,6 +51,12 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
     "fadegrays": {"label": "Gray fade", "label_ru": "Серый fade", "xfade": "fadegrays", "note": "gray flash"},
     "distance": {"label": "Distance", "label_ru": "Дистанция", "xfade": "distance", "note": "zoom dissolve"},
     "radial": {"label": "Radial", "label_ru": "Радиал", "xfade": "radial", "note": "radial wipe"},
+    "slideup": {"label": "Slide ↑", "label_ru": "Сдвиг ↑", "xfade": "slideup", "note": "slide up"},
+    "slidedown": {"label": "Slide ↓", "label_ru": "Сдвиг ↓", "xfade": "slidedown", "note": "slide down"},
+    "rectcrop": {"label": "Rect crop", "label_ru": "Rect crop", "xfade": "rectcrop", "note": "rect wipe"},
+    "circlecrop": {"label": "Circle crop", "label_ru": "Круг crop", "xfade": "circlecrop", "note": "circle wipe"},
+    "squeezeh": {"label": "Squeeze H", "label_ru": "Сжатие H", "xfade": "squeezeh", "note": "horizontal squeeze"},
+    "squeezev": {"label": "Squeeze V", "label_ru": "Сжатие V", "xfade": "squeezev", "note": "vertical squeeze"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -2420,6 +2426,13 @@ CLIP_FX_KEYS: tuple[str, ...] = (
     "posterize",
     "rgbshift",
     "edge_fade",
+    "speed_start",
+    "speed_end",
+    "tint",
+    "sepia",
+    "highpass_hz",
+    "lowpass_hz",
+    "pan",
 )
 
 
@@ -2677,6 +2690,273 @@ def extract_clip_audio(
         "path": str(dest),
         "rel": _rel(dest),
         "honesty": "Extract audio = ffmpeg -vn. Not CapCut stem separation / AI vocals.",
+    }
+
+
+def apply_clip_speed_ramp(
+    src: Path,
+    out: Path,
+    *,
+    speed_start: float = 0.75,
+    speed_end: float = 1.25,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Two-half speed ramp (start→end). Not CapCut curve / bezier speed craft."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    s0 = max(0.5, min(2.0, float(speed_start or 1.0)))
+    s1 = max(0.5, min(2.0, float(speed_end or 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if abs(s0 - 1.0) < 0.02 and abs(s1 - 1.0) < 0.02:
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "skipped": True,
+            "speed_start": 1.0,
+            "speed_end": 1.0,
+        }
+    if abs(s0 - s1) < 0.02:
+        return apply_clip_speed(src, out, speed=s0, fps=fps)
+    dur = float(media_duration_sec(src) or 0.0)
+    if dur < 0.4:
+        return apply_clip_speed(src, out, speed=(s0 + s1) / 2.0, fps=fps)
+    mid = dur / 2.0
+    work = out.parent / f"_ramp_{uuid.uuid4().hex[:6]}"
+    work.mkdir(parents=True, exist_ok=True)
+    a = work / "a.mp4"
+    b = work / "b.mp4"
+    run_ffmpeg(
+        [
+            "-i",
+            str(src),
+            "-t",
+            f"{mid:.3f}",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            str(a),
+        ]
+    )
+    run_ffmpeg(
+        [
+            "-ss",
+            f"{mid:.3f}",
+            "-i",
+            str(src),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            str(b),
+        ]
+    )
+    a2 = work / "a2.mp4"
+    b2 = work / "b2.mp4"
+    r0 = apply_clip_speed(a, a2, speed=s0, fps=fps)
+    r1 = apply_clip_speed(b, b2, speed=s1, fps=fps)
+    if not (r0.get("ok") and r1.get("ok")):
+        shutil.rmtree(work, ignore_errors=True)
+        return {"ok": False, "error": "speed ramp half failed"}
+    lst = work / "list.txt"
+    lst.write_text(
+        f"file '{a2.resolve().as_posix()}'\nfile '{b2.resolve().as_posix()}'\n",
+        encoding="utf-8",
+    )
+    run_ffmpeg(
+        [
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(lst),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            str(out),
+        ]
+    )
+    shutil.rmtree(work, ignore_errors=True)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "speed_start": s0,
+        "speed_end": s1,
+        "honesty": "Speed ramp = two half-clips at constant speeds. Not CapCut curve ramps.",
+    }
+
+
+def apply_clip_tint(
+    src: Path,
+    out: Path,
+    *,
+    tint: str = "none",
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Simple tint / sepia / cool wash. Not CapCut LUT marketplace."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    key = (tint or "none").strip().lower()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    presets = {
+        "sepia": (
+            "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"
+        ),
+        "warm": "eq=saturation=1.15:gamma_r=1.08:gamma_b=0.92",
+        "cool": "eq=saturation=1.05:gamma_r=0.92:gamma_b=1.1",
+        "teal": "colorbalance=rs=-0.08:gs=0.05:bs=0.12:rm=-0.05:bm=0.08",
+    }
+    if key in {"", "none"} or key not in presets:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "tint": "none"}
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        presets[key],
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "tint": key,
+        "honesty": "Tint = ffmpeg colorchannelmixer/eq. Not CapCut LUT packs.",
+    }
+
+
+def apply_clip_audio_filter(
+    src: Path,
+    out: Path,
+    *,
+    highpass_hz: float = 0.0,
+    lowpass_hz: float = 0.0,
+    pan: float = 0.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Highpass / lowpass / simple stereo pan. Not CapCut EQ racks / AI clean."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    hp = max(0.0, min(800.0, float(highpass_hz or 0.0)))
+    lp = max(0.0, min(16000.0, float(lowpass_hz or 0.0)))
+    pn = max(-1.0, min(1.0, float(pan or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or (hp < 20 and (lp <= 0 or lp >= 15000) and abs(pn) < 0.05):
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "skipped": True,
+            "highpass_hz": 0.0,
+            "lowpass_hz": 0.0,
+            "pan": 0.0,
+        }
+    parts: list[str] = []
+    if hp >= 20:
+        parts.append(f"highpass=f={hp:.1f}")
+    if 200 <= lp <= 14000:
+        parts.append(f"lowpass=f={lp:.1f}")
+    if abs(pn) >= 0.05:
+        # pan -1=left … +1=right via extrastereo-ish volume balance
+        left = max(0.05, 1.0 - max(0.0, pn))
+        right = max(0.05, 1.0 + min(0.0, pn))
+        # normalize so louder side ≈ 1
+        m = max(left, right)
+        left, right = left / m, right / m
+        parts.append(f"pan=stereo|c0={left:.3f}*c0|c1={right:.3f}*c0")
+    af = ",".join(parts)
+    args = [
+        "-i",
+        str(src),
+        "-c:v",
+        "copy",
+        "-af",
+        af,
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        str(out),
+    ]
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "highpass_hz": hp if hp >= 20 else 0.0,
+        "lowpass_hz": lp if 200 <= lp <= 14000 else 0.0,
+        "pan": pn,
+        "honesty": "Audio filter = highpass/lowpass/pan. Not CapCut EQ / AI denoise.",
+    }
+
+
+def move_timeline_clip(*, from_index: int, to_index: int) -> dict[str, Any]:
+    """Reorder one clip by index. Not CapCut magnetic timeline AI."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    n = len(clips)
+    if n < 2:
+        return {"ok": False, "error": "need ≥2 clips", "timeline": tl}
+    try:
+        fi, ti = int(from_index), int(to_index)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index", "timeline": tl}
+    if fi < 0 or fi >= n or ti < 0 or ti >= n:
+        return {"ok": False, "error": "index out of range", "timeline": tl}
+    if fi == ti:
+        return {"ok": True, "timeline": tl, "moved": False}
+    item = clips.pop(fi)
+    clips.insert(ti, item)
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "moved": True,
+        "from_index": fi,
+        "to_index": ti,
+        "honesty": "Move clip = list reorder. Not CapCut magnetic / auto rearrange.",
     }
 
 
@@ -3245,6 +3525,42 @@ def render_timeline(
             if efr.get("ok") and not efr.get("skipped"):
                 piece = ef
                 keyframe_notes.append(f"{c.get('name') or i}:edge_fade={edge_fade:.2f}")
+        try:
+            speed_start = float(c.get("speed_start") or 1.0)
+            speed_end = float(c.get("speed_end") or 1.0)
+        except (TypeError, ValueError):
+            speed_start, speed_end = 1.0, 1.0
+        if abs(speed_start - 1.0) >= 0.02 or abs(speed_end - 1.0) >= 0.02:
+            sr = work / f"sr_{i:03d}.mp4"
+            srr = apply_clip_speed_ramp(
+                piece, sr, speed_start=speed_start, speed_end=speed_end, fps=fps
+            )
+            if srr.get("ok") and not srr.get("skipped"):
+                piece = sr
+                keyframe_notes.append(
+                    f"{c.get('name') or i}:ramp={speed_start:.2f}->{speed_end:.2f}"
+                )
+        tint = str(c.get("tint") or ("sepia" if c.get("sepia") else "none")).strip().lower()
+        if tint and tint not in {"none", ""}:
+            tn = work / f"tint_{i:03d}.mp4"
+            tnr = apply_clip_tint(piece, tn, tint=tint, fps=fps)
+            if tnr.get("ok") and not tnr.get("skipped"):
+                piece = tn
+                keyframe_notes.append(f"{c.get('name') or i}:tint={tint}")
+        try:
+            hp = float(c.get("highpass_hz") or 0.0)
+            lp = float(c.get("lowpass_hz") or 0.0)
+            pan = float(c.get("pan") or 0.0)
+        except (TypeError, ValueError):
+            hp, lp, pan = 0.0, 0.0, 0.0
+        if hp >= 20 or (200 <= lp <= 14000) or abs(pan) >= 0.05:
+            aq = work / f"aq_{i:03d}.mp4"
+            aqr = apply_clip_audio_filter(
+                piece, aq, highpass_hz=hp, lowpass_hz=lp, pan=pan, fps=fps
+            )
+            if aqr.get("ok") and not aqr.get("skipped"):
+                piece = aq
+                keyframe_notes.append(f"{c.get('name') or i}:afilter")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

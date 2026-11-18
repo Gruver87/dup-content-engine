@@ -1146,6 +1146,7 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         extract_clip_audio,
         list_grade_presets,
         load_timeline,
+        move_timeline_clip,
         resolve_user_path,
         shuffle_timeline,
         timeline_stats,
@@ -1167,6 +1168,11 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         return shuffle_timeline(seed=int(seed) if seed is not None else None)
     if action == "stats":
         return timeline_stats()
+    if action == "move":
+        return move_timeline_clip(
+            from_index=int(body.get("from_index") if body.get("from_index") is not None else body.get("from") or 0),
+            to_index=int(body.get("to_index") if body.get("to_index") is not None else body.get("to") or 0),
+        )
     if action == "clear_fx":
         idx = body.get("index")
         return clear_timeline_fx(index=int(idx) if idx is not None else None)
