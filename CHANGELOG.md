@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.44 — 2026-11-18
+
+- Montage **grade**: brightness / contrast / saturation (ffmpeg eq) — not CapCut curves/LUT
+- Console Timeline: Bright / Contrast / Sat
+
 ## 0.1.43 — 2026-11-18
 
 - Montage **mirror** (h / v / hv) on stitch — not CapCut 3D flip

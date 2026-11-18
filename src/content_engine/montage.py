@@ -884,6 +884,61 @@ def apply_clip_overlay_text(
     }
 
 
+def apply_clip_grade(
+    src: Path,
+    out: Path,
+    *,
+    brightness: float = 0.0,
+    contrast: float = 1.0,
+    saturation: float = 1.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Basic eq grade: brightness (-1..1), contrast/saturation (0.5..1.5).
+
+    Honesty: single-pass ffmpeg eq — not CapCut curves / LUTs / DaVinci grade.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    b = max(-0.5, min(0.5, float(brightness or 0.0)))
+    c = max(0.5, min(1.5, float(contrast if contrast is not None else 1.0)))
+    s = max(0.5, min(1.5, float(saturation if saturation is not None else 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if abs(b) < 0.01 and abs(c - 1.0) < 0.02 and abs(s - 1.0) < 0.02:
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "brightness": 0.0,
+            "contrast": 1.0,
+            "saturation": 1.0,
+            "skipped": True,
+        }
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    vf = f"eq=brightness={b:.3f}:contrast={c:.3f}:saturation={s:.3f}"
+    args = ["-i", str(src), "-vf", vf, "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "brightness": b,
+        "contrast": c,
+        "saturation": s,
+        "honesty": (
+            "Clip grade = ffmpeg eq brightness/contrast/saturation. "
+            "Not CapCut curves / LUT packs / DaVinci."
+        ),
+    }
+
+
 def apply_clip_mirror(
     src: Path,
     out: Path,
@@ -1274,6 +1329,33 @@ def render_timeline(
             if mr.get("ok"):
                 piece = mir
                 keyframe_notes.append(f"{c.get('name') or i}:mirror={mr.get('mirror', mirror)}")
+        try:
+            brightness = float(c.get("brightness") or 0.0)
+        except (TypeError, ValueError):
+            brightness = 0.0
+        try:
+            contrast = float(c.get("contrast") if c.get("contrast") is not None else 1.0)
+        except (TypeError, ValueError):
+            contrast = 1.0
+        try:
+            saturation = float(c.get("saturation") if c.get("saturation") is not None else 1.0)
+        except (TypeError, ValueError):
+            saturation = 1.0
+        if abs(brightness) >= 0.01 or abs(contrast - 1.0) >= 0.02 or abs(saturation - 1.0) >= 0.02:
+            gr = work / f"grd_{i:03d}.mp4"
+            gd = apply_clip_grade(
+                piece,
+                gr,
+                brightness=brightness,
+                contrast=contrast,
+                saturation=saturation,
+                fps=fps,
+            )
+            if gd.get("ok") and not gd.get("skipped"):
+                piece = gr
+                keyframe_notes.append(
+                    f"{c.get('name') or i}:grade=b{brightness:.2f}/c{contrast:.2f}/s{saturation:.2f}"
+                )
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

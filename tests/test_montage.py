@@ -3,6 +3,7 @@ from pathlib import Path
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
     apply_clip_freeze,
+    apply_clip_grade,
     apply_clip_keyframes,
     apply_clip_mirror,
     apply_clip_overlay_text,
@@ -148,6 +149,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     mh = apply_clip_mirror(src, mir, mirror="h", fps=12)
     assert mh["ok"] is True and mh.get("mirror") == "h"
     assert Path(mh["path"]).is_file()
+
+    grd = out / "grd.mp4"
+    gg = apply_clip_grade(src, grd, brightness=0.1, contrast=1.1, saturation=1.2, fps=12)
+    assert gg["ok"] is True and Path(gg["path"]).is_file()
+    assert "eq" in (gg.get("honesty") or "").lower() or "CapCut" in (gg.get("honesty") or "")
 
 
 def test_aspect_presets(tmp_path, monkeypatch):
