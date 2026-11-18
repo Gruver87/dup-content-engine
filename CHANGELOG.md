@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.47 — 2026-11-18
+
+Batch (one ship):
+- Clip **look**: blur / sharpen / B&W / vignette
+- Clip **loops** (hard concat repeat)
+- Timeline **Split** (UI) + **Thumb** frame API
+- Montage **music bed** on stitch (prefs) — procedural/assets, not CapCut stock
+- Auto thumb after stitch
+
 ## 0.1.46 — 2026-11-18
 
 - Montage **audio fade** in/out (afade) per clip — not CapCut envelope keyframes

@@ -1090,6 +1090,14 @@ def action_montage_export() -> dict[str, Any]:
     return export_montage()
 
 
+def action_montage_thumb(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.montage import export_montage_thumb
+
+    body = body or {}
+    at = body.get("at_sec")
+    return export_montage_thumb(at_sec=float(at) if at is not None else 0.4)
+
+
 def action_montage_send(body: dict[str, Any] | None = None) -> dict[str, Any]:
     from content_engine.montage import send_montage
 

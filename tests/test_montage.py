@@ -5,6 +5,8 @@ from content_engine.montage import (
     apply_clip_freeze,
     apply_clip_grade,
     apply_clip_keyframes,
+    apply_clip_look,
+    apply_clip_loop,
     apply_clip_mirror,
     apply_clip_overlay_text,
     apply_clip_rotate,
@@ -164,6 +166,19 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     rt = apply_clip_rotate(src, rot, degrees=90, fps=12)
     assert rt["ok"] is True and rt.get("rotate") == 90
     assert Path(rt["path"]).is_file()
+
+    look = out / "look.mp4"
+    lk = apply_clip_look(src, look, blur=1.0, grayscale=True, vignette=True, fps=12)
+    assert lk["ok"] is True and Path(lk["path"]).is_file()
+
+    looped = out / "loop.mp4"
+    lp = apply_clip_loop(src, looped, loops=2, width=320, height=560, fps=12)
+    assert lp["ok"] is True and lp.get("loops") == 2
+    assert media_duration_sec(looped) > media_duration_sec(src)
+
+    prefs = save_montage_prefs({"music_bed": True, "music_volume": 0.15, "music_mood": "warm"})
+    assert prefs["prefs"]["music_bed"] is True
+    assert abs(float(prefs["prefs"]["music_volume"]) - 0.15) < 0.01
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

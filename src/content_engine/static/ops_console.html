@@ -899,12 +899,31 @@ body {
                 <option value="270">270°</option>
               </select>
             </label>
+            <label class="field"><span data-i18n="clipBlur">Blur</span>
+              <input id="clipBlur" type="number" min="0" max="8" step="0.5" value="0" style="min-width:70px"/>
+            </label>
+            <label class="field"><span data-i18n="clipSharpen">Sharpen</span>
+              <input id="clipSharpen" type="number" min="0" max="2" step="0.1" value="0" style="min-width:70px"/>
+            </label>
+            <label class="check"><input type="checkbox" id="clipGray"/> <span data-i18n="clipGray">B&amp;W</span></label>
+            <label class="check"><input type="checkbox" id="clipVignette"/> <span data-i18n="clipVignette">Vignette</span></label>
+            <label class="field"><span data-i18n="clipLoops">Loops</span>
+              <input id="clipLoops" type="number" min="1" max="8" step="1" value="1" style="min-width:60px"/>
+            </label>
             <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label class="check"><input type="checkbox" id="montageBed"/> <span data-i18n="montageBed">Music bed on stitch</span></label>
+            <label class="field"><span data-i18n="montageBedVol">Bed vol</span>
+              <input id="montageBedVol" type="number" min="0.02" max="0.5" step="0.02" value="0.12" style="min-width:70px"/>
+            </label>
           </div>
           <div class="row" style="margin-top:10px">
             <button class="btn ghost" id="btnTrim" data-i18n="btnTrim">Trim</button>
             <button class="btn ghost" id="btnImgClip" data-i18n="btnImgClip">Image → clip</button>
             <button class="btn ghost" id="btnDup" data-i18n="btnDup">Duplicate</button>
+            <button class="btn ghost" id="btnSplit" data-i18n="btnSplit">Split</button>
+            <button class="btn ghost" id="btnThumb" data-i18n="btnThumb">Thumb</button>
             <button class="btn" id="btnRenderTl" data-i18n="btnRenderTl">Stitch</button>
           </div>
           <div class="phone" style="margin-top:14px"><video id="montagePreview" controls playsinline></video></div>
@@ -1163,11 +1182,11 @@ const I18N = {
     applyHookPack: "Применить к теме → script",
     previewHook: "Превью строк",
     gapMontageTitle: "Монтаж · сверка CapCut Desktop",
-    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send/transitions/KF/speed/aspect. Нет: multi-track bezier, auto-reframe AI.",
+    gapMontageSub: "Есть: trim/dup/split/stitch/speed/look/bed/thumb/aspect. Нет: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", btnSplit: "Разрезать", btnThumb: "Превью-кадр", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1325,11 +1344,11 @@ const I18N = {
     applyHookPack: "Apply to topic → script",
     previewHook: "Preview lines",
     gapMontageTitle: "Montage · CapCut Desktop scan",
-    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send/transitions/KF/speed/aspect. Missing: multi-track bezier, auto-reframe AI.",
+    gapMontageSub: "Have: trim/dup/split/stitch/speed/look/bed/thumb/aspect. Missing: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", btnSplit: "Split", btnThumb: "Thumb", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2270,6 +2289,11 @@ function renderTimeline() {
     if ($("clipContrast")) $("clipContrast").value = c.contrast != null ? c.contrast : 1;
     if ($("clipSat")) $("clipSat").value = c.saturation != null ? c.saturation : 1;
     if ($("clipRotate")) $("clipRotate").value = String(c.rotate || 0);
+    if ($("clipBlur")) $("clipBlur").value = c.blur || 0;
+    if ($("clipSharpen")) $("clipSharpen").value = c.sharpen || 0;
+    if ($("clipGray")) $("clipGray").checked = !!c.grayscale;
+    if ($("clipVignette")) $("clipVignette").checked = !!c.vignette;
+    if ($("clipLoops")) $("clipLoops").value = c.loops || 1;
   }
 }
 $("btnApplyKf")?.addEventListener("click", () => {
@@ -2295,6 +2319,11 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.saturation = Math.max(0.5, Math.min(1.5, parseFloat($("clipSat")?.value || "1") || 1));
   c.rotate = [0, 90, 180, 270].includes(parseInt($("clipRotate")?.value || "0", 10))
     ? parseInt($("clipRotate")?.value || "0", 10) : 0;
+  c.blur = Math.max(0, Math.min(8, parseFloat($("clipBlur")?.value || "0") || 0));
+  c.sharpen = Math.max(0, Math.min(2, parseFloat($("clipSharpen")?.value || "0") || 0));
+  c.grayscale = !!$("clipGray")?.checked;
+  c.vignette = !!$("clipVignette")?.checked;
+  c.loops = Math.max(1, Math.min(8, parseInt($("clipLoops")?.value || "1", 10) || 1));
   TIMELINE[TL_INDEX] = c;
   renderTimeline();
   setDirty(true);
@@ -2338,6 +2367,12 @@ async function loadMedia() {
     else if (tlFull.montage_prefs && tlFull.montage_prefs.transition_sec != null) TRANSITION_SEC = Number(tlFull.montage_prefs.transition_sec);
   }
   if ($("transDur")) $("transDur").value = String(TRANSITION_SEC);
+  if (tlFull && tlFull.montage_prefs) {
+    if ($("montageBed")) $("montageBed").checked = !!tlFull.montage_prefs.music_bed;
+    if ($("montageBedVol") && tlFull.montage_prefs.music_volume != null) {
+      $("montageBedVol").value = tlFull.montage_prefs.music_volume;
+    }
+  }
   renderTransGrid();
   renderMediaList();
   renderTimeline();
@@ -2538,6 +2573,43 @@ $("btnDup").onclick = () => {
   TIMELINE.splice(i + 1, 0, JSON.parse(JSON.stringify(TIMELINE[i])));
   renderTimeline(); setDirty(true);
 };
+$("btnSplit")?.addEventListener("click", () => {
+  if (TL_INDEX == null || !TIMELINE[TL_INDEX]) return toast("select timeline clip");
+  const c = TIMELINE[TL_INDEX];
+  const start = Number(c.start_sec || 0);
+  const dur = c.duration_sec != null ? Number(c.duration_sec) : null;
+  const cutAt = Number($("trimStart")?.value || 0);
+  // Split: use trimStart as offset into clip, or mid-duration
+  let mid;
+  if (dur != null && dur > 0.4) {
+    mid = (cutAt > 0.1 && cutAt < dur - 0.1) ? cutAt : dur / 2;
+  } else {
+    return toast("set Duration (s) on clip to split");
+  }
+  pushUndo();
+  const a = { ...c, start_sec: start, duration_sec: mid, name: (c.name || "clip") + "·A" };
+  const b = {
+    ...c,
+    start_sec: start + mid,
+    duration_sec: Math.max(0.2, dur - mid),
+    name: (c.name || "clip") + "·B",
+  };
+  TIMELINE.splice(TL_INDEX, 1, a, b);
+  TL_INDEX = TL_INDEX + 1;
+  renderTimeline(); setDirty(true);
+  toast(t("btnSplit"));
+});
+$("btnThumb")?.addEventListener("click", async () => {
+  const r = await api("/api/montage/thumb", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ at_sec: 0.4 }),
+  });
+  log($("montageLog"), r);
+  if (r.ok && r.rel) {
+    toast(t("btnThumb") + " · " + r.rel);
+    setPreview(r.rel, "montage thumb");
+  }
+});
 
 (function wireMediaDrop() {
   const box = $("mediaDrop"); const file = $("mediaFile");
@@ -2640,10 +2712,12 @@ $("btnRenderTl").onclick = async () => {
   await persistTimeline({quiet:true});
   const aspect = currentAspect();
   const [width, height] = aspectDims(aspect);
+  const music_bed = !!$("montageBed")?.checked;
+  const music_volume = Math.max(0.02, Math.min(0.5, parseFloat($("montageBedVol")?.value || "0.12") || 0.12));
   try {
     await api("/api/montage/prefs", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ aspect }),
+      body: JSON.stringify({ aspect, music_bed, music_volume }),
     });
   } catch (_) {}
   const r = await api("/api/timeline/render", {
@@ -2654,6 +2728,9 @@ $("btnRenderTl").onclick = async () => {
   if (result && result.latest_rel) {
     $("montagePreview").src = mediaUrl(result.latest_rel);
     setPreview(result.latest_rel, "montage stitch · " + (result.transition || TRANSITION) + " · " + (result.aspect || aspect));
+  }
+  if (result && result.thumb && result.thumb.rel) {
+    toast("thumb · " + result.thumb.rel);
   }
   await loadMedia();
 };

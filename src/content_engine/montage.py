@@ -102,7 +102,14 @@ def resolve_transition(name: str | None) -> str:
 
 
 def load_montage_prefs() -> dict[str, Any]:
-    base = {"transition": "cut", "transition_sec": 0.35, "aspect": "9:16"}
+    base: dict[str, Any] = {
+        "transition": "cut",
+        "transition_sec": 0.35,
+        "aspect": "9:16",
+        "music_bed": False,
+        "music_volume": 0.12,
+        "music_mood": "warm",
+    }
     if PREFS_PATH.is_file():
         try:
             data = json.loads(PREFS_PATH.read_text(encoding="utf-8"))
@@ -113,10 +120,17 @@ def load_montage_prefs() -> dict[str, Any]:
                     base["transition_sec"] = float(data["transition_sec"])
                 if data.get("aspect"):
                     base["aspect"] = resolve_aspect(str(data["aspect"]))
+                if "music_bed" in data:
+                    base["music_bed"] = bool(data["music_bed"])
+                if "music_volume" in data:
+                    base["music_volume"] = float(data["music_volume"])
+                if data.get("music_mood"):
+                    base["music_mood"] = str(data["music_mood"])
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     base["transition_sec"] = max(0.15, min(1.2, float(base["transition_sec"])))
     base["aspect"] = resolve_aspect(str(base.get("aspect") or "9:16"))
+    base["music_volume"] = max(0.02, min(0.5, float(base.get("music_volume") or 0.12)))
     w, h = aspect_size(base["aspect"])
     base["width"] = w
     base["height"] = h
@@ -134,8 +148,20 @@ def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
             pass
     if patch.get("aspect"):
         cur["aspect"] = resolve_aspect(str(patch["aspect"]))
-    # drop derived size keys before write
-    store = {k: cur[k] for k in ("transition", "transition_sec", "aspect") if k in cur}
+    if "music_bed" in patch:
+        cur["music_bed"] = bool(patch["music_bed"])
+    if "music_volume" in patch:
+        try:
+            cur["music_volume"] = max(0.02, min(0.5, float(patch["music_volume"])))
+        except (TypeError, ValueError):
+            pass
+    if patch.get("music_mood"):
+        cur["music_mood"] = str(patch["music_mood"]).strip() or "warm"
+    store = {
+        k: cur[k]
+        for k in ("transition", "transition_sec", "aspect", "music_bed", "music_volume", "music_mood")
+        if k in cur
+    }
     MONTAGE_OUT.mkdir(parents=True, exist_ok=True)
     PREFS_PATH.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
     return {"ok": True, "prefs": load_montage_prefs()}
@@ -978,6 +1004,265 @@ def apply_clip_mirror(
     }
 
 
+def apply_clip_look(
+    src: Path,
+    out: Path,
+    *,
+    blur: float = 0.0,
+    sharpen: float = 0.0,
+    grayscale: bool = False,
+    vignette: bool = False,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Blur / sharpen / grayscale / vignette in one pass.
+
+    Honesty: basic ffmpeg filters — not CapCut effect packs / AI look.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    bl = max(0.0, min(8.0, float(blur or 0.0)))
+    sh = max(0.0, min(2.0, float(sharpen or 0.0)))
+    gray = bool(grayscale)
+    vig = bool(vignette)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if bl < 0.05 and sh < 0.05 and not gray and not vig:
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "skipped": True,
+            "blur": 0.0,
+            "sharpen": 0.0,
+            "grayscale": False,
+            "vignette": False,
+        }
+    parts: list[str] = []
+    if bl >= 0.05:
+        parts.append(f"gblur=sigma={bl:.2f}")
+    if sh >= 0.05:
+        parts.append(f"unsharp=5:5:{sh:.2f}:5:5:0.0")
+    if gray:
+        parts.append("hue=s=0")
+    if vig:
+        parts.append("vignette=PI/4")
+    vf = ",".join(parts) if parts else "null"
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "blur": bl,
+        "sharpen": sh,
+        "grayscale": gray,
+        "vignette": vig,
+        "honesty": (
+            "Clip look = gblur/unsharp/hue/vignette. "
+            "Not CapCut effect marketplace / AI looks."
+        ),
+    }
+
+
+def apply_clip_loop(
+    src: Path,
+    out: Path,
+    *,
+    loops: int = 2,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Repeat clip N times (hard concat). Not CapCut smart loop / beat sync."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    n = max(1, min(8, int(loops or 1)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if n <= 1:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "loops": 1, "skipped": True}
+    w = int(width or 1080)
+    h = int(height or 1920)
+    work = out.parent / f"{out.stem}_loop_work"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    norm = work / "base.mp4"
+    _norm_clip(src, norm, width=w, height=h, fps=fps)
+    parts = [norm] * n
+    joined = concat_clips(parts, out, width=w, height=h, fps=fps, transition="cut")
+    shutil.rmtree(work, ignore_errors=True)
+    return {
+        "ok": bool(joined.get("ok")),
+        "path": str(out),
+        "rel": _rel(out),
+        "loops": n,
+        "honesty": "Clip loop = hard concat repeat. Not CapCut beat-sync loop.",
+    }
+
+
+def mix_montage_bed(
+    src: Path,
+    out: Path,
+    *,
+    volume: float = 0.12,
+    mood: str = "warm",
+) -> dict[str, Any]:
+    """Mix soft music bed under stitched edit audio.
+
+    Honesty: procedural/assets bed — not CapCut stock library license claim.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    vol = max(0.02, min(0.5, float(volume or 0.12)))
+    dur = float(media_duration_sec(src) or 1.0)
+    bed = out.with_suffix(".bed.mp3")
+    from content_engine.audio_bed import generate_soft_bed, resolve_music_file
+
+    brand = {"audio": {"music_mood": mood, "music_bed": True}}
+    assets = PACKAGE_ROOT / "assets"
+    bed_src = resolve_music_file(brand, assets, package_root=PACKAGE_ROOT)
+    if bed_src:
+        run_ffmpeg(
+            [
+                "-stream_loop",
+                "-1",
+                "-i",
+                str(bed_src),
+                "-t",
+                f"{dur:.3f}",
+                "-c:a",
+                "libmp3lame",
+                "-q:a",
+                "4",
+                str(bed),
+            ]
+        )
+        note = f"file:{bed_src.name}"
+    else:
+        try:
+            from content_engine.studio_kit import generate_mood_bed
+
+            generate_mood_bed(bed, dur, mood)
+            note = f"mood:{mood}"
+        except Exception:  # noqa: BLE001
+            generate_soft_bed(bed, dur)
+            note = "sine"
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if has_audio:
+        fc = (
+            f"[1:a]volume={vol:.3f}[bed];"
+            f"[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0[a]"
+        )
+        args = [
+            "-i",
+            str(src),
+            "-i",
+            str(bed),
+            "-filter_complex",
+            fc,
+            "-map",
+            "0:v",
+            "-map",
+            "[a]",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-shortest",
+            str(out),
+        ]
+    else:
+        args = [
+            "-i",
+            str(src),
+            "-i",
+            str(bed),
+            "-filter_complex",
+            f"[1:a]volume={vol:.3f}[a]",
+            "-map",
+            "0:v",
+            "-map",
+            "[a]",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-shortest",
+            str(out),
+        ]
+    run_ffmpeg(args)
+    bed.unlink(missing_ok=True)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "bed": note,
+        "volume": vol,
+        "honesty": (
+            "Montage music bed = procedural/assets mix under edit. "
+            "Not CapCut commercial stock library."
+        ),
+    }
+
+
+def export_montage_thumb(*, at_sec: float = 0.4) -> dict[str, Any]:
+    """Grab a JPEG thumb from latest stitch."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    t = max(0.0, float(at_sec or 0.4))
+    out = MONTAGE_OUT / "edit_thumb.jpg"
+    run_ffmpeg(
+        [
+            "-ss",
+            f"{t:.3f}",
+            "-i",
+            str(mp4),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "3",
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "at_sec": t,
+        "honesty": "Thumb = single frame grab. Not CapCut cover designer / AI cover.",
+    }
+
+
 def apply_clip_rotate(
     src: Path,
     out: Path,
@@ -1461,6 +1746,49 @@ def render_timeline(
             if rr.get("ok"):
                 piece = rot
                 keyframe_notes.append(f"{c.get('name') or i}:rot={rotate}")
+        try:
+            blur = float(c.get("blur") or 0.0)
+        except (TypeError, ValueError):
+            blur = 0.0
+        try:
+            sharpen = float(c.get("sharpen") or 0.0)
+        except (TypeError, ValueError):
+            sharpen = 0.0
+        gray = bool(c.get("grayscale") or c.get("bw"))
+        vig = bool(c.get("vignette"))
+        if blur >= 0.05 or sharpen >= 0.05 or gray or vig:
+            lk = work / f"look_{i:03d}.mp4"
+            lr = apply_clip_look(
+                piece,
+                lk,
+                blur=blur,
+                sharpen=sharpen,
+                grayscale=gray,
+                vignette=vig,
+                fps=fps,
+            )
+            if lr.get("ok") and not lr.get("skipped"):
+                piece = lk
+                bits = []
+                if blur >= 0.05:
+                    bits.append(f"blur{blur:.1f}")
+                if sharpen >= 0.05:
+                    bits.append(f"sh{sharpen:.1f}")
+                if gray:
+                    bits.append("bw")
+                if vig:
+                    bits.append("vig")
+                keyframe_notes.append(f"{c.get('name') or i}:look={'+'.join(bits)}")
+        try:
+            loops = int(c.get("loops") or 1)
+        except (TypeError, ValueError):
+            loops = 1
+        if loops > 1:
+            lp = work / f"loop_{i:03d}.mp4"
+            lo = apply_clip_loop(piece, lp, loops=loops, width=width, height=height, fps=fps)
+            if lo.get("ok") and not lo.get("skipped"):
+                piece = lp
+                keyframe_notes.append(f"{c.get('name') or i}:loop={loops}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
@@ -1474,6 +1802,19 @@ def render_timeline(
         transition_sec=float(tsec) if tsec is not None else None,
     )
     if result.get("ok"):
+        if prefs.get("music_bed"):
+            bedded = MONTAGE_OUT / f"edit_{stamp}_bed.mp4"
+            mb = mix_montage_bed(
+                out,
+                bedded,
+                volume=float(prefs.get("music_volume") or 0.12),
+                mood=str(prefs.get("music_mood") or "warm"),
+            )
+            if mb.get("ok"):
+                out = bedded
+                result["music_bed"] = mb
+                result["path"] = str(out)
+                result["rel"] = _rel(out)
         latest = MONTAGE_OUT / "edit_latest.mp4"
         shutil.copy2(out, latest)
         result["latest"] = str(latest)
@@ -1483,6 +1824,9 @@ def render_timeline(
         result["width"] = width
         result["height"] = height
         save_montage_prefs({"aspect": aspect_key})
+        thumb = export_montage_thumb(at_sec=0.4)
+        if thumb.get("ok"):
+            result["thumb"] = thumb
     return result
 
 
