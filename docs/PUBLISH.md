@@ -8,13 +8,19 @@
 
 No Playwright. No session cookies. No “auto-post every hour” bots in this repo.
 
-## YouTube (optional)
+## YouTube (official Data API)
 
 ```bash
 pip install -e ".[youtube]"
+# validate without calling Google:
+python -m content_engine youtube out/demo/VIDEO.mp4 --pack out/demo/verified_pack_….json --dry-run
+# private upload (default):
+python -m content_engine youtube out/demo/VIDEO.mp4 --pack out/demo/verified_pack_….json --privacy private
 ```
 
-OAuth client secrets stay local (`client_secrets.json`, `token.json` — gitignored). Wire a thin uploader only after export works; never make YouTube auth a demo dependency.
+Requires `client_secrets.json` (Google Cloud OAuth desktop client) and writes `token.json` locally — both gitignored.  
+Successful upload appends `publish_allow` to `audit.jsonl` (counts toward daily cap).  
+Refuse upload if pack gate is not ALLOW. There is no Shorts-specific endpoint — vertical ≤3 min becomes a Short.
 
 ## Rate limits
 

@@ -1,4 +1,4 @@
-"""CLI: demo / run / gate / doctor / export."""
+"""CLI: demo / run / gate / doctor / export / teaser / write-script / youtube."""
 
 from __future__ import annotations
 
@@ -33,11 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     demo = sub.add_parser("demo", help="Offline-friendly fixture → mp4 + verified pack")
     demo.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "demo")
     demo.add_argument("--keep-workspace", action="store_true")
-    demo.add_argument(
-        "--offline-tts",
-        action="store_true",
-        help="Skip edge-tts network; use ffmpeg tone bed",
-    )
+    demo.add_argument("--offline-tts", action="store_true")
 
     run = sub.add_parser("run", help="Run pipeline on a script.json")
     run.add_argument("script", type=Path)
@@ -56,19 +52,34 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--pack", type=Path, default=None)
     exp.add_argument("--dest", type=Path, default=PACKAGE_ROOT / "out" / "export")
 
-    teaser = sub.add_parser(
-        "teaser",
-        help="README.md → ~30s vertical teaser (script + pipeline + optional export)",
-    )
-    teaser.add_argument("readme", type=Path, help="Path to project README.md")
+    teaser = sub.add_parser("teaser", help="README.md → ~30s vertical teaser")
+    teaser.add_argument("readme", type=Path)
     teaser.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "teaser")
     teaser.add_argument("--target-sec", type=float, default=30.0)
-    teaser.add_argument("--name", type=str, default=None, help="Override project name")
-    teaser.add_argument("--script-only", action="store_true", help="Write script.json only")
-    teaser.add_argument("--export", action="store_true", help="Copy ALLOW mp4 to export drop")
+    teaser.add_argument("--name", type=str, default=None)
+    teaser.add_argument("--script-only", action="store_true")
+    teaser.add_argument("--export", action="store_true")
     teaser.add_argument("--offline-tts", action="store_true")
     teaser.add_argument("--keep-workspace", action="store_true")
     teaser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
+
+    ws = sub.add_parser("write-script", help="Topic → script.json (offline or optional LLM)")
+    ws.add_argument("topic", type=str)
+    ws.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "scripts" / "script.json")
+    ws.add_argument("--language", default="en")
+    ws.add_argument("--offline", action="store_true", help="Force offline template (no LLM)")
+    ws.add_argument("--run", action="store_true", help="Also run pipeline after write")
+    ws.add_argument("--offline-tts", action="store_true")
+
+    yt = sub.add_parser("youtube", help="Upload ALLOW mp4 via YouTube Data API (official)")
+    yt.add_argument("mp4", type=Path)
+    yt.add_argument("--pack", type=Path, required=True, help="verified_pack JSON (required)")
+    yt.add_argument("--title", type=str, default=None)
+    yt.add_argument("--description", type=str, default="")
+    yt.add_argument("--privacy", choices=["private", "unlisted", "public"], default="private")
+    yt.add_argument("--dry-run", action="store_true")
+    yt.add_argument("--client-secrets", type=Path, default=None)
+    yt.add_argument("--token", type=Path, default=None)
 
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
@@ -78,12 +89,18 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     if args.cmd == "doctor":
+        from content_engine.caption_burn import find_font
+        from content_engine.voice import resolve_provider
+
         info = {
             "version": __version__,
             "ffmpeg": ffmpeg_bin(),
+            "font": str(find_font()) if find_font() else None,
+            "tts_provider": resolve_provider(),
             "fixture": str(DEFAULT_FIXTURE),
             "policy": str(DEFAULT_POLICY),
-            "note": "demo PASS ≠ audience growth; TikTok = manual upload of exported mp4",
+            "assets": str(PACKAGE_ROOT / "assets"),
+            "note": "demo PASS ≠ audience growth; TikTok = manual upload; YT = official API",
         }
         print(json.dumps(info, indent=2))
         return 0
@@ -167,6 +184,47 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps({"export": copied}, indent=2))
         return 0 if report.ok else 1
+
+    if args.cmd == "write-script":
+        from content_engine.script_writer import write_topic_script
+
+        script, source = write_topic_script(
+            args.topic,
+            args.out,
+            language=args.language,
+            prefer_llm=not args.offline,
+        )
+        print(json.dumps({"source": source, "script": str(args.out), "title": script.title}, indent=2))
+        if not args.run:
+            return 0
+        report = run_pipeline(
+            args.out,
+            work_dir=PACKAGE_ROOT / "workspace",
+            out_dir=args.out.parent / "runs",
+            allow_network_tts=not args.offline_tts,
+        )
+        print(json.dumps(report.to_dict(), indent=2))
+        return 0 if report.ok else 1
+
+    if args.cmd == "youtube":
+        from content_engine.youtube_publish import youtube_upload
+
+        pack = json.loads(args.pack.read_text(encoding="utf-8")) if args.pack.is_file() else {}
+        title = args.title or pack.get("title") or args.mp4.stem
+        result = youtube_upload(
+            args.mp4,
+            title=title,
+            description=args.description or "Published via DUP Content Engine (official API).",
+            tags=pack.get("tags") if isinstance(pack.get("tags"), list) else ["dup-labs"],
+            client_secrets=args.client_secrets,
+            token_path=args.token,
+            privacy=args.privacy,
+            dry_run=args.dry_run,
+            pack_path=args.pack,
+            audit_path=PACKAGE_ROOT / "audit.jsonl",
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
 
     return 2
 

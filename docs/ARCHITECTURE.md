@@ -46,6 +46,8 @@ ASS burn may fall back to sidecar `.ass` when libass is unavailable; that is rec
 
 ## Extension points
 
-- New TTS providers behind `synthesize_scene`
-- New visual providers behind `make_scene_clip`
-- YouTube upload as optional extra (`[youtube]` deps) — never required for demo green
+- TTS providers: `edge` | `elevenlabs` | `azure` | `offline` (`voice.py`)
+- Visuals: local `assets/` → Pexels/Pixabay → synthetic (`visuals.py`)
+- Captions: per-clip burn via drawtext/Pillow (`caption_burn.py`)
+- Topic scripts: `script_writer.py` (offline + optional LLM)
+- YouTube: official Data API (`youtube_publish.py`) — never required for demo green

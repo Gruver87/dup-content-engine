@@ -122,7 +122,14 @@ def write_verified_pack(
     script: Script,
     gate: GateResult,
     run_id: str,
+    licenses: list[Any] | None = None,
 ) -> Path:
+    lic_rows: list[dict[str, Any]] = []
+    for item in licenses or []:
+        if hasattr(item, "to_dict"):
+            lic_rows.append(item.to_dict())
+        elif isinstance(item, dict):
+            lic_rows.append(item)
     pack = {
         "schema": "dup.content_verified_pack.v1",
         "run_id": run_id,
@@ -133,6 +140,7 @@ def write_verified_pack(
         "bytes": mp4.stat().st_size if mp4.is_file() else 0,
         "duration_sec": media_duration_sec(mp4) if mp4.is_file() else 0,
         "gate": gate.to_dict(),
+        "licenses": lic_rows,
         "note": "ALLOW pack is not a growth/monetization claim",
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)

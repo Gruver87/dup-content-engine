@@ -1,4 +1,4 @@
-"""Assemble scenes + voice + captions into final mp4."""
+"""Assemble captioned scenes + voice into final mp4."""
 
 from __future__ import annotations
 
@@ -28,18 +28,15 @@ def concat_audio(scene_mp3s: list[Path], out_mp3: Path) -> Path:
     return out_mp3
 
 
-def render_final(
+def mux_final(
     timings: list[SceneTiming],
     voice_mp3: Path,
-    captions_ass: Path,
     out_mp4: Path,
     *,
-    width: int,
-    height: int,
     fps: int,
     work_dir: Path | None = None,
 ) -> Path:
-    """Concat video clips, mux voice, burn ASS."""
+    """Concat (already captioned) clips and mux voice — no ASS dependency."""
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     work = work_dir or out_mp4.parent
     work.mkdir(parents=True, exist_ok=True)
@@ -72,23 +69,14 @@ def render_final(
             str(silent_video),
         ]
     )
-
-    # Burn subtitles — ass filter needs escaped path on Windows
-    ass_path = captions_ass.resolve().as_posix().replace(":", "\\:")
     run_ffmpeg(
         [
             "-i",
             str(silent_video),
             "-i",
             str(voice_mp3),
-            "-vf",
-            f"ass='{ass_path}'",
             "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
+            "copy",
             "-c:a",
             "aac",
             "-b:a",
@@ -98,3 +86,19 @@ def render_final(
         ]
     )
     return out_mp4
+
+
+# Back-compat alias used by older imports
+def render_final(
+    timings: list[SceneTiming],
+    voice_mp3: Path,
+    captions_ass: Path,  # unused — captions burned per-clip upstream
+    out_mp4: Path,
+    *,
+    width: int,
+    height: int,
+    fps: int,
+    work_dir: Path | None = None,
+) -> Path:
+    _ = (captions_ass, width, height)
+    return mux_final(timings, voice_mp3, out_mp4, fps=fps, work_dir=work_dir)

@@ -1,4 +1,4 @@
-"""Orchestrate script → voice → visuals → render → gate → pack."""
+"""Orchestrate script → voice → visuals → captions → mux → gate → pack."""
 
 from __future__ import annotations
 
@@ -10,16 +10,18 @@ from pathlib import Path
 from typing import Any
 
 from content_engine.ass_builder import build_ass
+from content_engine.caption_burn import caption_all_clips
 from content_engine.gate import evaluate_gate, write_verified_pack
 from content_engine.models import RunReport, SceneTiming, Script
 from content_engine.policy import load_policy
-from content_engine.render import concat_audio, render_final
+from content_engine.render import concat_audio, mux_final
+from content_engine.visuals import AssetLicense, make_scene_clip
 from content_engine.voice import synthesize_scene, write_durations
-from content_engine.visuals import make_scene_clip
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_POLICY = PACKAGE_ROOT / "configs" / "policy.toml"
 DEFAULT_FIXTURE = PACKAGE_ROOT / "fixtures" / "demo_script.json"
+DEFAULT_ASSETS = PACKAGE_ROOT / "assets"
 
 
 def load_script(path: Path) -> Script:
@@ -50,6 +52,11 @@ def run_pipeline(
     height = int(media.get("height") or 1920)
     fps = int(media.get("fps") or 30)
     provider = str(vis.get("provider") or "synthetic")
+    assets_cfg = vis.get("assets_dir")
+    assets_dir = Path(assets_cfg) if assets_cfg else DEFAULT_ASSETS
+    if not assets_dir.is_absolute():
+        assets_dir = PACKAGE_ROOT / assets_dir
+    tts_provider = str(voice_cfg.get("provider") or "edge")
 
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     work = work_dir / run_id
@@ -62,6 +69,7 @@ def run_pipeline(
     script = load_script(script_path)
     notes: list[str] = []
     timings: list[SceneTiming] = []
+    licenses: list[AssetLicense] = []
 
     for scene in script.scenes:
         audio = work / "audio" / f"{scene.id}.mp3"
@@ -71,9 +79,10 @@ def run_pipeline(
             voice=str(voice_cfg.get("voice") or "en-US-ChristopherNeural"),
             rate=str(voice_cfg.get("rate") or "+0%"),
             allow_network=allow_network_tts,
+            provider=tts_provider if allow_network_tts else "offline",
         )
         clip = work / "clips" / f"{scene.id}.mp4"
-        make_scene_clip(
+        _, lic = make_scene_clip(
             clip,
             duration_sec=dur,
             width=width,
@@ -81,7 +90,9 @@ def run_pipeline(
             fps=fps,
             visual_query=scene.visual_query,
             provider=provider,
+            assets_dir=assets_dir if assets_dir.is_dir() else None,
         )
+        licenses.append(lic)
         timings.append(
             SceneTiming(
                 id=scene.id,
@@ -102,55 +113,18 @@ def run_pipeline(
     concat_audio([Path(t.audio_path) for t in timings], voice_full)
     voice_dur = sum(t.duration_sec for t in timings)
 
+    # Always burn captions onto clips (Windows-safe) + keep ASS sidecar
     captions = build_ass(
         script.scenes, timings, work / "captions.ass", width=width, height=height
     )
-    final_mp4 = out_dir / f"{run_id}.mp4"
-    try:
-        render_final(
-            timings,
-            voice_full,
-            captions,
-            final_mp4,
-            width=width,
-            height=height,
-            fps=fps,
-            work_dir=work,
-        )
-    except Exception as exc:  # noqa: BLE001
-        # Fallback: mux without burned subs (still ship .ass beside output)
-        notes.append(f"ass_burn_fallback: {exc}")
-        from content_engine.ffmpeg_util import run_ffmpeg
+    timings, cap_notes = caption_all_clips(
+        script.scenes, timings, work, width=width, height=height
+    )
+    notes.extend(cap_notes)
 
-        concat_list = work / "clips.txt"
-        concat_list.write_text(
-            "\n".join(f"file '{Path(t.clip_path).resolve().as_posix()}'" for t in timings)
-            + "\n",
-            encoding="utf-8",
-        )
-        run_ffmpeg(
-            [
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(concat_list),
-                "-i",
-                str(voice_full),
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-shortest",
-                str(final_mp4),
-            ]
-        )
-        shutil.copy2(captions, out_dir / f"{run_id}.ass")
+    final_mp4 = out_dir / f"{run_id}.mp4"
+    mux_final(timings, voice_full, final_mp4, fps=fps, work_dir=work)
+    shutil.copy2(captions, out_dir / f"{run_id}.ass")
 
     audit = PACKAGE_ROOT / "audit.jsonl"
     gate = evaluate_gate(
@@ -169,9 +143,9 @@ def run_pipeline(
                 script=script,
                 gate=gate,
                 run_id=run_id,
+                licenses=licenses,
             )
         )
-        # also copy script sidecar
         (out_dir / f"{run_id}.script.json").write_text(
             json.dumps(script.to_dict(), indent=2) + "\n", encoding="utf-8"
         )
@@ -185,6 +159,7 @@ def run_pipeline(
             "run_id": run_id,
             "detail": gate.detail,
             "output": str(final_mp4) if final_mp4.is_file() else None,
+            "licenses": [lic.to_dict() for lic in licenses],
         },
     )
 

@@ -1,0 +1,10 @@
+{
+  "note": "Put mp4/jpg/png files in this folder. Map each filename below for the verified pack.",
+  "files": {
+    "example.mp4": {
+      "license": "local-user-provided",
+      "attribution": "Replace with your credit line",
+      "source_url": null
+    }
+  }
+}

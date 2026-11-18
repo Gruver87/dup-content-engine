@@ -68,12 +68,16 @@ Artifacts land under `out/demo/`:
 | `dup-content gate video.mp4 --script …` | Re-check only |
 | `dup-content export video.mp4` | Copy to drop folder for manual TikTok/YT |
 | `dup-content teaser README.md` | README → ~30s teaser + optional `--export` |
+| `dup-content write-script "topic"` | Topic → script.json (`--offline` / optional LLM) |
+| `dup-content youtube video.mp4 --pack …` | Official YouTube upload (`--dry-run` safe) |
 
 ## Policy
 
 `configs/policy.toml` is the publish contract: canvas, duration window, min size, A/V slack, stopwords, daily cap. Edit there — do not hardcode “green” in marketing copy.
 
-Optional stock: set `PEXELS_API_KEY` and `visuals.provider = "pexels"` (falls back to synthetic if the API fails).
+Optional stock: set `PEXELS_API_KEY` / `PIXABAY_API_KEY` and `visuals.provider = "auto"` (falls back to synthetic).  
+Local B-roll: drop files in `assets/` and record them in `assets/licenses.json`.  
+TTS providers: `edge` (default), `elevenlabs`, `azure` via env — see `.env.example`.
 
 ## What we refuse
 

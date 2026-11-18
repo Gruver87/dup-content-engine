@@ -21,15 +21,19 @@ max_silence_db = -40.0
 duration_slack_sec = 2.0
 
 [voice]
+# provider: edge | elevenlabs | azure | offline
+provider = "edge"
 # edge-tts neural voices (no API key)
 voice = "en-US-ChristopherNeural"
 # Alternatives: ru-RU-DmitryNeural, en-US-JennyNeural, ru-RU-SvetlanaNeural
+# elevenlabs: set ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID (voice field ignored or used as id)
 rate = "+8%"
 
 [visuals]
-# demo / offline: synthetic ffmpeg backgrounds (no external keys)
-# live: pexels | pixabay when PEXELS_API_KEY / PIXABAY_API_KEY set
+# synthetic | pexels | pixabay | auto (stock then synthetic)
+# local files in assets/ always preferred when present
 provider = "synthetic"
+assets_dir = "assets"
 orientation = "portrait"
 
 [text]
