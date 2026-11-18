@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.42 — 2026-11-18
+
+- Montage **freeze** hold (`freeze_sec`) appends still frame on stitch — not CapCut freeze+ramp
+- Console Timeline: Freeze (s) field
+
 ## 0.1.41 — 2026-11-18
 
 - Montage **aspect presets** (9:16 / 1:1 / 16:9) wired to stitch + prefs — not CapCut auto-reframe AI

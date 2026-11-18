@@ -2,6 +2,7 @@ from pathlib import Path
 
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
+    apply_clip_freeze,
     apply_clip_keyframes,
     apply_clip_overlay_text,
     apply_clip_speed,
@@ -136,6 +137,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     tr = apply_clip_overlay_text(src, txt, text="Hook title", width=320, height=560)
     assert tr["ok"] is True and Path(tr["path"]).is_file()
     assert "CapCut" in (tr.get("honesty") or "")
+
+    frz = out / "frz.mp4"
+    fz = apply_clip_freeze(src, frz, hold_sec=0.5, width=320, height=560, fps=12)
+    assert fz["ok"] is True and Path(fz["path"]).is_file()
+    assert media_duration_sec(frz) > media_duration_sec(src)
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

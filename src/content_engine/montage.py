@@ -884,6 +884,77 @@ def apply_clip_overlay_text(
     }
 
 
+def apply_clip_freeze(
+    src: Path,
+    out: Path,
+    *,
+    hold_sec: float = 1.0,
+    at_sec: float | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Hold a still frame for hold_sec (append or replace short clip).
+
+    Honesty: constant freeze hold — not CapCut freeze + speed ramp craft / optical flow.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    hold = max(0.2, min(8.0, float(hold_sec or 1.0)))
+    dur = float(media_duration_sec(src) or 0.0)
+    if dur < 0.05:
+        return {"ok": False, "error": "clip too short"}
+    t = float(at_sec) if at_sec is not None else max(0.0, dur - 0.04)
+    t = max(0.0, min(t, max(0.0, dur - 0.02)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    w = int(width or 1080)
+    h = int(height or 1920)
+    # Extract one frame → image_to_clip hold, then concat with original
+    frame = out.with_suffix(".freeze.png")
+    run_ffmpeg(
+        [
+            "-ss",
+            f"{t:.3f}",
+            "-i",
+            str(src),
+            "-frames:v",
+            "1",
+            "-q:v",
+            "2",
+            str(frame),
+        ]
+    )
+    if not frame.is_file():
+        return {"ok": False, "error": "freeze frame extract failed"}
+    still = out.with_name(out.stem + "_still.mp4")
+    image_to_clip(frame, still, duration_sec=hold, width=w, height=h, fps=fps)
+    frame.unlink(missing_ok=True)
+    # Append freeze after source
+    work_a = out.with_name(out.stem + "_a.mp4")
+    _norm_clip(src, work_a, width=w, height=h, fps=fps)
+    joined = concat_clips(
+        [work_a, still],
+        out,
+        width=w,
+        height=h,
+        fps=fps,
+        transition="cut",
+    )
+    work_a.unlink(missing_ok=True)
+    still.unlink(missing_ok=True)
+    return {
+        "ok": bool(joined.get("ok")),
+        "path": str(out),
+        "rel": _rel(out),
+        "hold_sec": hold,
+        "at_sec": round(t, 3),
+        "honesty": (
+            "Freeze = still frame hold appended (or end-hold). "
+            "Not CapCut freeze+ramp / optical-flow craft."
+        ),
+    }
+
+
 def apply_clip_volume(
     src: Path,
     out: Path,
@@ -1133,6 +1204,24 @@ def render_timeline(
             if ot.get("ok"):
                 piece = ox
                 keyframe_notes.append(f"{c.get('name') or i}:text={overlay_text[:24]}")
+        try:
+            freeze_sec = float(c.get("freeze_sec") or 0.0)
+        except (TypeError, ValueError):
+            freeze_sec = 0.0
+        if freeze_sec >= 0.2:
+            fz = work / f"frz_{i:03d}.mp4"
+            fr = apply_clip_freeze(
+                piece,
+                fz,
+                hold_sec=freeze_sec,
+                at_sec=float(c["freeze_at"]) if c.get("freeze_at") is not None else None,
+                width=width,
+                height=height,
+                fps=fps,
+            )
+            if fr.get("ok"):
+                piece = fz
+                keyframe_notes.append(f"{c.get('name') or i}:freeze={freeze_sec:.2f}s")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
