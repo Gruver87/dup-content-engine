@@ -646,33 +646,50 @@ def apply_clip_speed(
     out: Path,
     *,
     speed: float = 1.0,
+    reverse: bool = False,
     fps: int = 30,
 ) -> dict[str, Any]:
-    """Constant per-clip speed 0.5x–2.0x (setpts + atempo).
+    """Constant per-clip speed 0.5x–2.0x (+ optional reverse).
 
-    Honesty: not CapCut curve speed ramps / reverse / freeze-frame craft.
+    Honesty: not CapCut curve speed ramps / freeze-frame craft.
     """
     if not src.is_file():
         return {"ok": False, "error": f"missing: {src}"}
     sp = max(0.5, min(2.0, float(speed or 1.0)))
+    do_rev = bool(reverse)
     out.parent.mkdir(parents=True, exist_ok=True)
-    if abs(sp - 1.0) < 0.02:
+    if abs(sp - 1.0) < 0.02 and not do_rev:
         shutil.copy2(src, out)
         return {
             "ok": True,
             "path": str(out),
             "rel": _rel(out),
             "speed": 1.0,
+            "reverse": False,
             "skipped": True,
         }
-    # video: PTS/speed; audio: atempo in 0.5–2.0 when stream exists
     has_audio = any(
         (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
     )
-    vf = f"setpts=PTS/{sp:.4f}"
+    vparts: list[str] = []
+    if do_rev:
+        vparts.append("reverse")
+    if abs(sp - 1.0) >= 0.02:
+        vparts.append(f"setpts=PTS/{sp:.4f}")
+    elif do_rev:
+        vparts.append("setpts=PTS-STARTPTS")
+    vf = ",".join(vparts) if vparts else "null"
     args: list[str] = ["-i", str(src), "-vf", vf, "-r", str(fps)]
     if has_audio:
-        args += ["-af", f"atempo={sp:.4f}", "-c:a", "aac", "-b:a", "128k"]
+        aparts: list[str] = []
+        if do_rev:
+            aparts.append("areverse")
+        if abs(sp - 1.0) >= 0.02:
+            aparts.append(f"atempo={sp:.4f}")
+        if aparts:
+            args += ["-af", ",".join(aparts), "-c:a", "aac", "-b:a", "128k"]
+        else:
+            args += ["-c:a", "copy"]
     else:
         args += ["-an"]
     args += [
@@ -690,9 +707,10 @@ def apply_clip_speed(
         "path": str(out),
         "rel": _rel(out),
         "speed": sp,
+        "reverse": do_rev,
         "honesty": (
-            "Clip speed = constant setpts/atempo 0.5–2x. "
-            "Not CapCut speed ramps / reverse / freeze craft."
+            "Clip speed/reverse = constant setpts/atempo (+ optional reverse). "
+            "Not CapCut curve ramps / freeze craft."
         ),
     }
 
@@ -835,12 +853,16 @@ def render_timeline(
             speed = float(c.get("speed") or 1.0)
         except (TypeError, ValueError):
             speed = 1.0
-        if abs(speed - 1.0) >= 0.02:
+        do_rev = bool(c.get("reverse"))
+        if abs(speed - 1.0) >= 0.02 or do_rev:
             sped = work / f"spd_{i:03d}.mp4"
-            sp = apply_clip_speed(piece, sped, speed=speed, fps=fps)
+            sp = apply_clip_speed(piece, sped, speed=speed, reverse=do_rev, fps=fps)
             if sp.get("ok"):
                 piece = sped
-                keyframe_notes.append(f"{c.get('name') or i}:speed={sp.get('speed', speed):.2f}x")
+                tag = f"{c.get('name') or i}:speed={sp.get('speed', speed):.2f}x"
+                if do_rev:
+                    tag += "+rev"
+                keyframe_notes.append(tag)
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
         zoom = float(c.get("zoom") or 1.0)

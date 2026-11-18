@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.38 — 2026-11-18
+
+- Montage **reverse** clip flag on stitch (with speed) — not CapCut freeze/curve craft
+- Console Timeline: Reverse checkbox
+
 ## 0.1.37 — 2026-11-18
 
 - Montage **clip speed** 0.5×–2× (constant setpts/atempo on stitch) — not CapCut ramps

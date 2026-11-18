@@ -863,6 +863,7 @@ body {
                 <option value="2">2×</option>
               </select>
             </label>
+            <label class="check"><input type="checkbox" id="clipReverse"/> <span data-i18n="clipReverse">Reverse</span></label>
             <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
           </div>
           <div class="row" style="margin-top:10px">
@@ -1131,7 +1132,7 @@ const I18N = {
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1293,7 +1294,7 @@ const I18N = {
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2205,7 +2206,7 @@ function renderTimeline() {
     <li data-ti="${i}" class="${TL_INDEX===i?"selected":""}">
       <div>
         <div><strong>${i+1}. ${c.name || c.rel}</strong></div>
-        <div class="mono">start=${c.start_sec||0}s${c.duration_sec!=null?" · dur="+c.duration_sec+"s":""}${(c.speed&&c.speed!=1)?" · "+c.speed+"×":""}${(c.fade_in||c.fade_out||(c.zoom&&c.zoom>1))?" · kf":""}</div>
+        <div class="mono">start=${c.start_sec||0}s${c.duration_sec!=null?" · dur="+c.duration_sec+"s":""}${(c.speed&&c.speed!=1)?" · "+c.speed+"×":""}${c.reverse?" · rev":""}${(c.fade_in||c.fade_out||(c.zoom&&c.zoom>1))?" · kf":""}</div>
       </div>
       <div class="mini">
         <button class="btn ghost" data-up="${i}" title="Move up">${t("moveUp")}</button>
@@ -2221,6 +2222,7 @@ function renderTimeline() {
     if ($("kfFadeOut")) $("kfFadeOut").value = c.fade_out || 0;
     if ($("kfZoom")) $("kfZoom").value = c.zoom || 1;
     if ($("clipSpeed")) $("clipSpeed").value = String(c.speed || 1);
+    if ($("clipReverse")) $("clipReverse").checked = !!c.reverse;
   }
 }
 $("btnApplyKf")?.addEventListener("click", () => {
@@ -2231,6 +2233,7 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.fade_out = Math.max(0, parseFloat($("kfFadeOut")?.value || "0") || 0);
   c.zoom = Math.max(1, Math.min(1.25, parseFloat($("kfZoom")?.value || "1") || 1));
   c.speed = Math.max(0.5, Math.min(2, parseFloat($("clipSpeed")?.value || "1") || 1));
+  c.reverse = !!$("clipReverse")?.checked;
   TIMELINE[TL_INDEX] = c;
   renderTimeline();
   setDirty(true);

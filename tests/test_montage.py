@@ -115,6 +115,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     assert media_duration_sec(dest) < 0.7
     assert "ramp" in (r.get("honesty") or "").lower() or "CapCut" in (r.get("honesty") or "")
 
+    rev = out / "rev.mp4"
+    rr = apply_clip_speed(src, rev, speed=1.0, reverse=True, fps=12)
+    assert rr["ok"] is True and rr.get("reverse") is True
+    assert Path(rr["path"]).is_file()
+
 
 def test_transitions_pack_and_fade(tmp_path, monkeypatch):
     out = tmp_path / "montage"
