@@ -69,7 +69,11 @@ Artifacts land under `out/demo/`:
 | `dup-content export video.mp4` | Copy to drop folder for manual TikTok/YT |
 | `dup-content teaser README.md` | README → ~30s teaser + optional `--export` |
 | `dup-content write-script "topic"` | Topic → script.json (`--offline` / optional LLM) |
+| `dup-content score script.json` | Hook heuristic (not a virality claim) |
+| `dup-content batch topics.txt` | A/B variants; `--scripts-only` or full renders |
+| `dup-content preview --out out/demo` | Local HTML preview |
 | `dup-content youtube video.mp4 --pack …` | Official YouTube upload (`--dry-run` safe) |
+| `dup-content instagram video.mp4 --pack …` | Official IG Reels (`--dry-run` / `--video-url`) |
 
 ## Policy
 

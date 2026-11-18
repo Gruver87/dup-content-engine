@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.3 — 2026-11-18
+
+P1 channel ops:
+
+- Brand kit (`configs/brand.toml`) — watermark + endcard
+- Music bed under voice (assets/music or generated sine) with volume duck
+- `dup-content batch topics.txt` — A/B hooks + ranking by heuristic
+- `dup-content score script.json` — hook heuristic (not a virality claim)
+- `dup-content preview` — local HTML preview of latest run
+- `dup-content instagram` — official Graph Reels path (dry-run + HTTPS video_url)
+
 ## 0.1.2 — 2026-11-18
 
 P0 production gaps:

@@ -22,6 +22,17 @@ Requires `client_secrets.json` (Google Cloud OAuth desktop client) and writes `t
 Successful upload appends `publish_allow` to `audit.jsonl` (counts toward daily cap).  
 Refuse upload if pack gate is not ALLOW. There is no Shorts-specific endpoint — vertical ≤3 min becomes a Short.
 
+## Instagram Reels (official Graph API)
+
+```bash
+python -m content_engine instagram out/demo/VIDEO.mp4 --pack out/demo/verified_pack_….json --dry-run
+# Live: host mp4 on HTTPS, then:
+# set IG_USER_ID / IG_ACCESS_TOKEN
+python -m content_engine instagram out/demo/VIDEO.mp4 --pack … --video-url https://example.com/v.mp4 --caption "…"
+```
+
+Meta requires a **public HTTPS `video_url`** (local paths refused). Successful publish appends `publish_allow`.
+
 ## Rate limits
 
 `configs/policy.toml`:

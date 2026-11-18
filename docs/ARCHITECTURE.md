@@ -50,4 +50,7 @@ ASS burn may fall back to sidecar `.ass` when libass is unavailable; that is rec
 - Visuals: local `assets/` → Pexels/Pixabay → synthetic (`visuals.py`)
 - Captions: per-clip burn via drawtext/Pillow (`caption_burn.py`)
 - Topic scripts: `script_writer.py` (offline + optional LLM)
-- YouTube: official Data API (`youtube_publish.py`) — never required for demo green
+- YouTube / Instagram: official APIs (`youtube_publish.py`, `instagram_publish.py`)
+- Brand + music: `brand.py`, `audio_bed.py` via `configs/brand.toml`
+- Batch A/B + hook heuristic: `batch.py`, `hook_score.py`
+- Preview: `preview.py` → local HTML

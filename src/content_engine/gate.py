@@ -123,6 +123,7 @@ def write_verified_pack(
     gate: GateResult,
     run_id: str,
     licenses: list[Any] | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> Path:
     lic_rows: list[dict[str, Any]] = []
     for item in licenses or []:
@@ -143,6 +144,8 @@ def write_verified_pack(
         "licenses": lic_rows,
         "note": "ALLOW pack is not a growth/monetization claim",
     }
+    if extra:
+        pack.update(extra)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(pack, indent=2) + "\n", encoding="utf-8")
     return out_path

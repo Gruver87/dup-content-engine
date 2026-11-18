@@ -1,0 +1,19 @@
+# Brand kit — overlays / endcard (not a growth claim)
+
+[brand]
+name = "DUP Labs"
+tagline = "Fail-closed tools you can verify"
+cta = "github.com/Gruver87"
+accent = "#1f6feb"
+# Optional logo (PNG with alpha). Relative to package root or absolute.
+# logo = "assets/logo.png"
+watermark = true
+watermark_opacity = 0.85
+endcard = true
+endcard_sec = 2.0
+
+[audio]
+# Soft bed under voice. Put a file in assets/music/ or leave enabled for generated bed.
+music_bed = true
+music_volume = 0.10
+# music_file = "assets/music/bed.mp3"

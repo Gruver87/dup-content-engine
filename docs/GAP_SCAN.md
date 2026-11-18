@@ -25,9 +25,9 @@ Script JSON, README teaser, edge-tts, synthetic/Pexels stub, FFmpeg bundle, ASS 
 4. **Topic → script writer** — `write-script` offline + optional LLM
 5. **YouTube Data API** — `youtube` CLI + dry-run + `publish_allow`
 
-## P1 — channel ops
+## P1 — shipped in 0.1.3
 
-Brand kit / endcard · music bed + ducking · batch A/B · hook heuristic (labeled, not “viral”) · local preview · Instagram Reels official publish
+Brand kit / endcard · music bed · batch A/B · hook heuristic · local preview · Instagram Reels (official / dry-run)
 
 ## P2 — later
 

@@ -1,4 +1,4 @@
-"""CLI: demo / run / gate / doctor / export / teaser / write-script / youtube."""
+"""CLI for DUP Content Engine."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from content_engine import __version__
 from content_engine.ffmpeg_util import ffmpeg_bin
 from content_engine.pipeline import (
+    DEFAULT_BRAND,
     DEFAULT_FIXTURE,
     DEFAULT_POLICY,
     PACKAGE_ROOT,
@@ -39,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("script", type=Path)
     run.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "runs")
     run.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
+    run.add_argument("--brand", type=Path, default=DEFAULT_BRAND)
     run.add_argument("--keep-workspace", action="store_true")
     run.add_argument("--offline-tts", action="store_true")
 
@@ -67,19 +69,47 @@ def build_parser() -> argparse.ArgumentParser:
     ws.add_argument("topic", type=str)
     ws.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "scripts" / "script.json")
     ws.add_argument("--language", default="en")
-    ws.add_argument("--offline", action="store_true", help="Force offline template (no LLM)")
-    ws.add_argument("--run", action="store_true", help="Also run pipeline after write")
+    ws.add_argument("--offline", action="store_true")
+    ws.add_argument("--run", action="store_true")
     ws.add_argument("--offline-tts", action="store_true")
+
+    sc = sub.add_parser("score", help="Hook heuristic score for a script (not a virality claim)")
+    sc.add_argument("script", type=Path)
+
+    batch = sub.add_parser("batch", help="Topics file → A/B variants (+ optional renders)")
+    batch.add_argument(
+        "topics",
+        type=Path,
+        nargs="?",
+        default=PACKAGE_ROOT / "topics.example.txt",
+    )
+    batch.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "batch")
+    batch.add_argument("--variants", default="A,B")
+    batch.add_argument("--limit", type=int, default=None)
+    batch.add_argument("--scripts-only", action="store_true")
+    batch.add_argument("--offline-tts", action="store_true", default=True)
+    batch.add_argument("--online-tts", action="store_true")
+
+    prev = sub.add_parser("preview", help="Write local HTML preview for latest run under --out")
+    prev.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "demo")
+    prev.add_argument("--open", action="store_true", help="Print file URI")
 
     yt = sub.add_parser("youtube", help="Upload ALLOW mp4 via YouTube Data API (official)")
     yt.add_argument("mp4", type=Path)
-    yt.add_argument("--pack", type=Path, required=True, help="verified_pack JSON (required)")
+    yt.add_argument("--pack", type=Path, required=True)
     yt.add_argument("--title", type=str, default=None)
     yt.add_argument("--description", type=str, default="")
     yt.add_argument("--privacy", choices=["private", "unlisted", "public"], default="private")
     yt.add_argument("--dry-run", action="store_true")
     yt.add_argument("--client-secrets", type=Path, default=None)
     yt.add_argument("--token", type=Path, default=None)
+
+    ig = sub.add_parser("instagram", help="Instagram Reels via Graph API (official)")
+    ig.add_argument("mp4", type=Path)
+    ig.add_argument("--pack", type=Path, required=True)
+    ig.add_argument("--caption", type=str, default="")
+    ig.add_argument("--video-url", type=str, default=None, help="Public HTTPS URL for Graph")
+    ig.add_argument("--dry-run", action="store_true")
 
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
@@ -99,8 +129,9 @@ def main(argv: list[str] | None = None) -> int:
             "tts_provider": resolve_provider(),
             "fixture": str(DEFAULT_FIXTURE),
             "policy": str(DEFAULT_POLICY),
+            "brand": str(DEFAULT_BRAND),
             "assets": str(PACKAGE_ROOT / "assets"),
-            "note": "demo PASS ≠ audience growth; TikTok = manual upload; YT = official API",
+            "note": "ALLOW ≠ growth; TikTok manual; YT/IG official APIs",
         }
         print(json.dumps(info, indent=2))
         return 0
@@ -126,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             work_dir=PACKAGE_ROOT / "workspace",
             out_dir=args.out,
             policy_path=args.policy,
+            brand_path=args.brand,
             allow_network_tts=not args.offline_tts,
             keep_workspace=args.keep_workspace,
         )
@@ -158,8 +190,7 @@ def main(argv: list[str] | None = None) -> int:
         args.out.mkdir(parents=True, exist_ok=True)
         script_path = args.out / "teaser_script.json"
         write_script(script, script_path)
-        meta = teaser_meta(script, args.target_sec)
-        print(json.dumps({"script": str(script_path), "meta": meta}, indent=2))
+        print(json.dumps({"script": str(script_path), "meta": teaser_meta(script, args.target_sec)}, indent=2))
         if args.script_only:
             return 0
         report = run_pipeline(
@@ -206,6 +237,38 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2))
         return 0 if report.ok else 1
 
+    if args.cmd == "score":
+        from content_engine.hook_score import score_script
+
+        script = load_script(args.script)
+        print(json.dumps(score_script(script), indent=2))
+        return 0
+
+    if args.cmd == "batch":
+        from content_engine.batch import run_batch
+
+        variants = [v.strip() for v in args.variants.split(",") if v.strip()]
+        summary = run_batch(
+            args.topics,
+            out_dir=args.out,
+            variants=variants,
+            limit=args.limit,
+            offline_tts=not args.online_tts,
+            offline_scripts=True,
+            scripts_only=args.scripts_only,
+        )
+        print(json.dumps(summary, indent=2))
+        return 0 if summary.get("allow_count", 0) > 0 or args.scripts_only else 1
+
+    if args.cmd == "preview":
+        from content_engine.preview import build_preview_html
+
+        result = build_preview_html(args.out)
+        print(json.dumps(result, indent=2))
+        if args.open and result.get("uri"):
+            print(result["uri"], file=sys.stderr)
+        return 0 if result.get("ok") else 1
+
     if args.cmd == "youtube":
         from content_engine.youtube_publish import youtube_upload
 
@@ -221,6 +284,22 @@ def main(argv: list[str] | None = None) -> int:
             privacy=args.privacy,
             dry_run=args.dry_run,
             pack_path=args.pack,
+            audit_path=PACKAGE_ROOT / "audit.jsonl",
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "instagram":
+        from content_engine.instagram_publish import instagram_reels_publish
+
+        pack = json.loads(args.pack.read_text(encoding="utf-8")) if args.pack.is_file() else {}
+        caption = args.caption or pack.get("title") or ""
+        result = instagram_reels_publish(
+            args.mp4,
+            caption=str(caption),
+            pack_path=args.pack,
+            video_url=args.video_url,
+            dry_run=args.dry_run,
             audit_path=PACKAGE_ROOT / "audit.jsonl",
         )
         print(json.dumps(result, indent=2))
