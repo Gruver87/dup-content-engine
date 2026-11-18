@@ -470,7 +470,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "thumb":
         from content_engine.brand import load_brand
-        from content_engine.pipeline import DEFAULT_BRAND
         from content_engine.thumbnail import make_thumbnail
 
         if not args.mp4.is_file():
