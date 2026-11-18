@@ -204,8 +204,18 @@ def run_pipeline(
 
     voice_dur = sum(t.duration_sec for t in timings)
 
+    fade_sec = float(media.get("scene_fade_sec") or 0.12)
     final_mp4 = out_dir / f"{run_id}.mp4"
-    mux_final(timings, voice_for_mux, final_mp4, fps=fps, work_dir=work)
+    mux_final(
+        timings,
+        voice_for_mux,
+        final_mp4,
+        fps=fps,
+        work_dir=work,
+        scene_fade_sec=fade_sec,
+    )
+    if fade_sec > 0:
+        notes.append(f"scene_fade={fade_sec}s")
     shutil.copy2(captions, out_dir / f"{run_id}.ass")
     srt_path = build_srt(script.scenes, timings, out_dir / f"{run_id}.srt")
     notes.append(f"srt={srt_path.name}")

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6 — 2026-11-18
+
+Ops runner (still no keys):
+
+- `day` / `series` — score A/B, render best offline, write `AB_REPORT.html`
+- `ab-report` / `jobs` — compare HTML + local job journal
+- Scene edge fades + soft audio loudness gate check
+- Agent skill `.agents/skills/content-engine-ops`
+
 ## 0.1.5 — 2026-11-18
 
 Offline channel kit (no API keys required):

@@ -28,6 +28,35 @@ def concat_audio(scene_mp3s: list[Path], out_mp3: Path) -> Path:
     return out_mp3
 
 
+def _apply_edge_fades(
+    clip: Path,
+    out: Path,
+    *,
+    duration_sec: float,
+    fade_sec: float,
+) -> Path:
+    """Short in/out fades on a scene clip (laptop-friendly polish)."""
+    fade = max(0.05, min(fade_sec, max(0.05, duration_sec / 4)))
+    fade_out_st = max(0.0, duration_sec - fade)
+    run_ffmpeg(
+        [
+            "-i",
+            str(clip),
+            "-vf",
+            f"fade=t=in:st=0:d={fade:.3f},fade=t=out:st={fade_out_st:.3f}:d={fade:.3f}",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            str(out),
+        ]
+    )
+    return out
+
+
 def mux_final(
     timings: list[SceneTiming],
     voice_mp3: Path,
@@ -35,14 +64,41 @@ def mux_final(
     *,
     fps: int,
     work_dir: Path | None = None,
+    scene_fade_sec: float = 0.0,
 ) -> Path:
     """Concat (already captioned) clips and mux voice — no ASS dependency."""
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     work = work_dir or out_mp4.parent
     work.mkdir(parents=True, exist_ok=True)
+
+    use_timings = timings
+    if scene_fade_sec and scene_fade_sec > 0:
+        fade_dir = work / "faded"
+        fade_dir.mkdir(parents=True, exist_ok=True)
+        faded: list[SceneTiming] = []
+        for t in timings:
+            if not t.clip_path:
+                raise RuntimeError(f"missing clip for scene {t.id}")
+            dest = fade_dir / f"{t.id}.mp4"
+            _apply_edge_fades(
+                Path(t.clip_path),
+                dest,
+                duration_sec=t.duration_sec,
+                fade_sec=scene_fade_sec,
+            )
+            faded.append(
+                SceneTiming(
+                    id=t.id,
+                    duration_sec=t.duration_sec,
+                    audio_path=t.audio_path,
+                    clip_path=str(dest),
+                )
+            )
+        use_timings = faded
+
     concat_list = work / "clips.txt"
     lines = []
-    for t in timings:
+    for t in use_timings:
         if not t.clip_path:
             raise RuntimeError(f"missing clip for scene {t.id}")
         lines.append(f"file '{Path(t.clip_path).resolve().as_posix()}'")

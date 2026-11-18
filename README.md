@@ -82,6 +82,9 @@ Artifacts land under `out/demo/`:
 | `dup-content aspects video.mp4` | Reframe to 9:16 / 1:1 / 16:9 |
 | `dup-content thumb video.mp4` | Cover JPG |
 | `dup-content-mcp` | Optional Cursor MCP (`pip install '.[mcp]'`) |
+| `dup-content day topics.txt` | Today's best A/B → offline render |
+| `dup-content series topics.txt --limit N` | Multi-topic series + AB report |
+| `dup-content jobs` | Local jobs.jsonl tail |
 
 ## Policy
 

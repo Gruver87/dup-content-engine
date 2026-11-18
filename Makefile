@@ -1,4 +1,4 @@
-.PHONY: doctor demo demo-offline verify install lint test clean
+.PHONY: doctor demo demo-offline day series verify install lint test clean
 
 PYTHON ?= python
 PIP ?= $(PYTHON) -m pip
@@ -14,6 +14,12 @@ demo:
 
 demo-offline:
 	$(PYTHON) -m content_engine demo --out out/demo --offline-tts
+
+day:
+	$(PYTHON) -m content_engine day topics.example.txt --out out/series
+
+series:
+	$(PYTHON) -m content_engine series topics.example.txt --limit 3 --out out/series
 
 verify: doctor demo-offline
 	@echo VERIFY_OK

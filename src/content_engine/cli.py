@@ -158,6 +158,41 @@ def build_parser() -> argparse.ArgumentParser:
     thumb.add_argument("--title", type=str, default=None)
     thumb.add_argument("--out", type=Path, default=None)
 
+    series = sub.add_parser(
+        "series",
+        help="Render N topics offline; pick best A/B hook (no API keys)",
+    )
+    series.add_argument(
+        "topics",
+        type=Path,
+        nargs="?",
+        default=PACKAGE_ROOT / "topics.example.txt",
+    )
+    series.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "series")
+    series.add_argument("--limit", type=int, default=1, help="How many topics (day=1)")
+    series.add_argument("--variants", default="A,B")
+    series.add_argument("--pick", choices=["best", "all"], default="best")
+    series.add_argument("--scripts-only", action="store_true")
+    series.add_argument("--online-tts", action="store_true")
+
+    day = sub.add_parser("day", help="Alias: series --limit 1 (today's offline short)")
+    day.add_argument(
+        "topics",
+        type=Path,
+        nargs="?",
+        default=PACKAGE_ROOT / "topics.example.txt",
+    )
+    day.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "series")
+    day.add_argument("--variants", default="A,B")
+    day.add_argument("--scripts-only", action="store_true")
+    day.add_argument("--online-tts", action="store_true")
+
+    abr = sub.add_parser("ab-report", help="Build HTML A/B report from SERIES.json")
+    abr.add_argument("series_json", type=Path)
+
+    jobs = sub.add_parser("jobs", help="Show recent local jobs.jsonl entries")
+    jobs.add_argument("--limit", type=int, default=20)
+
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
 
@@ -449,6 +484,40 @@ def main(argv: list[str] | None = None) -> int:
             brand=load_brand(DEFAULT_BRAND),
         )
         print(json.dumps({"ok": True, "thumbnail": str(path)}, indent=2))
+        return 0
+
+    if args.cmd in {"series", "day"}:
+        from content_engine.series import run_series
+
+        limit = 1 if args.cmd == "day" else args.limit
+        variants = [v.strip() for v in args.variants.split(",") if v.strip()]
+        summary = run_series(
+            args.topics,
+            out_dir=args.out,
+            limit=limit,
+            variants=variants,
+            pick="best" if args.cmd == "day" else getattr(args, "pick", "best"),
+            offline_tts=not args.online_tts,
+            scripts_only=args.scripts_only,
+        )
+        print(json.dumps(summary, indent=2))
+        return 0 if summary.get("allow_count", 0) > 0 or args.scripts_only else 1
+
+    if args.cmd == "ab-report":
+        from content_engine.ab_report import report_from_series_json
+
+        if not args.series_json.is_file():
+            print(f"missing: {args.series_json}", file=sys.stderr)
+            return 2
+        result = report_from_series_json(args.series_json)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "jobs":
+        from content_engine.journal import read_jobs
+
+        rows = read_jobs(limit=args.limit)
+        print(json.dumps({"count": len(rows), "jobs": rows}, indent=2))
         return 0
 
     return 2

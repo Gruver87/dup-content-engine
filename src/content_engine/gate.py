@@ -135,6 +135,26 @@ def evaluate_gate(
         )
     )
 
+    # Soft loudness floor (avoid near-silent masters)
+    if exists:
+        try:
+            from content_engine.clipper import _mean_volume_db
+
+            mean_db = _mean_volume_db(mp4)
+            floor = float(media.get("min_mean_volume_db") or -45.0)
+            checks.append(
+                _check(
+                    "audio_loudness",
+                    mean_db >= floor,
+                    f"mean_volume={mean_db:.1f}dB floor={floor}",
+                    hard=False,
+                )
+            )
+        except Exception:  # noqa: BLE001
+            checks.append(
+                _check("audio_loudness", True, "unprobed", hard=False)
+            )
+
     hard_fail = [c for c in checks if c["hard"] and not c["ok"]]
     allowed = len(hard_fail) == 0
     return GateResult(

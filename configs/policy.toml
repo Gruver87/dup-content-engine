@@ -21,6 +21,10 @@ max_silence_db = -40.0
 duration_slack_sec = 2.0
 require_resolution = false
 require_portrait = true
+# Soft edge fades between scenes (seconds)
+scene_fade_sec = 0.12
+# Soft audio loudness floor (mean_volume dB); below → soft warn
+min_mean_volume_db = -45.0
 
 [voice]
 # provider: edge | elevenlabs | azure | offline

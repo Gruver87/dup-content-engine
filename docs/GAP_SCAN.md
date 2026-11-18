@@ -37,6 +37,10 @@ TikTok Content Posting API (inbox default / direct opt-in) · analytics ingest �
 
 SRT + thumbnail · local calendar · multi-aspect reframe · stronger gate/verify · optional MCP
 
+## P4 — shipped in 0.1.6
+
+`day`/`series` runner · A/B HTML report · jobs journal · scene fades · soft loudness check · ops skill
+
 ## Refuse (keep)
 
 Cookie bots · donor scrape · virality-as-guarantee · ALLOW-as-growth · trading auto-post as “content”

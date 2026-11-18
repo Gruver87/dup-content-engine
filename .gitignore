@@ -15,6 +15,7 @@ venv/
 workspace/
 out/
 audit.jsonl
+jobs.jsonl
 .hypothesis/
 *.mp4
 !fixtures/**
