@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.37 — 2026-11-18
+
+- Montage **clip speed** 0.5×–2× (constant setpts/atempo on stitch) — not CapCut ramps
+- Console Timeline: Speed select + Apply KF
+
 ## 0.1.36 — 2026-11-18
 
 - Character **blink idle**: procedural eye blink frames on talking/idle clips (prefs `blink_idle`)

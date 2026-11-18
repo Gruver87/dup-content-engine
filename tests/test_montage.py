@@ -3,6 +3,7 @@ from pathlib import Path
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
     apply_clip_keyframes,
+    apply_clip_speed,
     concat_clips,
     delete_media,
     image_to_clip,
@@ -95,6 +96,24 @@ def test_apply_clip_keyframes(tmp_path, monkeypatch):
     assert Path(r["path"]).is_file()
     assert r["zoom"] == 1.08
     assert "bezier" in (r.get("honesty") or "").lower() or "CapCut" in (r.get("honesty") or "")
+
+
+def test_apply_clip_speed(tmp_path, monkeypatch):
+    from content_engine.ffmpeg_util import media_duration_sec
+
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    out.mkdir(parents=True)
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    dest = out / "fast.mp4"
+    r = apply_clip_speed(src, dest, speed=2.0, fps=12)
+    assert r["ok"] is True
+    assert Path(r["path"]).is_file()
+    assert r["speed"] == 2.0
+    # 2x → roughly half duration
+    assert media_duration_sec(dest) < 0.7
+    assert "ramp" in (r.get("honesty") or "").lower() or "CapCut" in (r.get("honesty") or "")
 
 
 def test_transitions_pack_and_fade(tmp_path, monkeypatch):

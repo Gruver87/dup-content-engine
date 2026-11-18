@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from content_engine.ffmpeg_util import media_duration_sec, run_ffmpeg
+from content_engine.ffmpeg_util import media_duration_sec, probe_json, run_ffmpeg
 from content_engine.pipeline import PACKAGE_ROOT
 
 LIBRARY = PACKAGE_ROOT / "assets" / "library"
@@ -641,6 +641,62 @@ def delete_media(path_or_rel: str) -> dict[str, Any]:
     return {"ok": True, "deleted": name, "rel": rel}
 
 
+def apply_clip_speed(
+    src: Path,
+    out: Path,
+    *,
+    speed: float = 1.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Constant per-clip speed 0.5x–2.0x (setpts + atempo).
+
+    Honesty: not CapCut curve speed ramps / reverse / freeze-frame craft.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    sp = max(0.5, min(2.0, float(speed or 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if abs(sp - 1.0) < 0.02:
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "speed": 1.0,
+            "skipped": True,
+        }
+    # video: PTS/speed; audio: atempo in 0.5–2.0 when stream exists
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    vf = f"setpts=PTS/{sp:.4f}"
+    args: list[str] = ["-i", str(src), "-vf", vf, "-r", str(fps)]
+    if has_audio:
+        args += ["-af", f"atempo={sp:.4f}", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args += [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        str(out),
+    ]
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "speed": sp,
+        "honesty": (
+            "Clip speed = constant setpts/atempo 0.5–2x. "
+            "Not CapCut speed ramps / reverse / freeze craft."
+        ),
+    }
+
+
 def apply_clip_keyframes(
     src: Path,
     out: Path,
@@ -775,6 +831,16 @@ def render_timeline(
                 width=width,
                 height=height,
             )
+        try:
+            speed = float(c.get("speed") or 1.0)
+        except (TypeError, ValueError):
+            speed = 1.0
+        if abs(speed - 1.0) >= 0.02:
+            sped = work / f"spd_{i:03d}.mp4"
+            sp = apply_clip_speed(piece, sped, speed=speed, fps=fps)
+            if sp.get("ok"):
+                piece = sped
+                keyframe_notes.append(f"{c.get('name') or i}:speed={sp.get('speed', speed):.2f}x")
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
         zoom = float(c.get("zoom") or 1.0)
