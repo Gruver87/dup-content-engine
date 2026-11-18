@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.48 — 2026-11-18
+
+Batch (one ship):
+- Clip **inset %**, **denoise**, **deshake**, **opacity**
+- Timeline **reverse order** + **zip pack** (mp4+thumb+timeline)
+- Honesty: not CapCut auto-reframe / warp stabilizer / Space cloud
+
 ## 0.1.47 — 2026-11-18
 
 Batch (one ship):

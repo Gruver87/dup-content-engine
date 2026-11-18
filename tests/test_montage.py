@@ -2,12 +2,15 @@ from pathlib import Path
 
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
+    apply_clip_crop_inset,
+    apply_clip_denoise,
     apply_clip_freeze,
     apply_clip_grade,
     apply_clip_keyframes,
     apply_clip_look,
     apply_clip_loop,
     apply_clip_mirror,
+    apply_clip_opacity,
     apply_clip_overlay_text,
     apply_clip_rotate,
     apply_clip_speed,
@@ -179,6 +182,18 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     prefs = save_montage_prefs({"music_bed": True, "music_volume": 0.15, "music_mood": "warm"})
     assert prefs["prefs"]["music_bed"] is True
     assert abs(float(prefs["prefs"]["music_volume"]) - 0.15) < 0.01
+
+    crop = out / "crop.mp4"
+    cp = apply_clip_crop_inset(src, crop, inset_pct=10, width=320, height=560, fps=12)
+    assert cp["ok"] is True and Path(cp["path"]).is_file()
+
+    dn = out / "dn.mp4"
+    dnr = apply_clip_denoise(src, dn, strength=1.5, fps=12)
+    assert dnr["ok"] is True and Path(dnr["path"]).is_file()
+
+    op = out / "op.mp4"
+    opr = apply_clip_opacity(src, op, opacity=0.7, width=320, height=560, fps=12)
+    assert opr["ok"] is True and Path(opr["path"]).is_file()
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

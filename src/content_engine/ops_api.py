@@ -1098,6 +1098,12 @@ def action_montage_thumb(body: dict[str, Any] | None = None) -> dict[str, Any]:
     return export_montage_thumb(at_sec=float(at) if at is not None else 0.4)
 
 
+def action_montage_zip() -> dict[str, Any]:
+    from content_engine.montage import export_montage_zip
+
+    return export_montage_zip()
+
+
 def action_montage_send(body: dict[str, Any] | None = None) -> dict[str, Any]:
     from content_engine.montage import send_montage
 

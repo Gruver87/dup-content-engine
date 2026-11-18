@@ -322,6 +322,9 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/montage/thumb":
                 self._json(200, ops_api.action_montage_thumb(body if body else None))
                 return
+            if path == "/api/montage/zip":
+                self._json(200, ops_api.action_montage_zip())
+                return
             if path == "/api/montage/send":
                 self._json(200, ops_api.action_montage_send(body))
                 return

@@ -1263,6 +1263,226 @@ def export_montage_thumb(*, at_sec: float = 0.4) -> dict[str, Any]:
     }
 
 
+def apply_clip_crop_inset(
+    src: Path,
+    out: Path,
+    *,
+    inset_pct: float = 10.0,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Center crop-in by inset % (punch-in). Not CapCut auto-reframe AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    pct = max(0.0, min(35.0, float(inset_pct or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if pct < 1.0:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "inset_pct": 0.0, "skipped": True}
+    w = int(width or 1080)
+    h = int(height or 1920)
+    # scale larger then crop center to canvas
+    scale = 1.0 + pct / 100.0
+    zw, zh = int(w * scale), int(h * scale)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    vf = (
+        f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h}"
+    )
+    args = ["-i", str(src), "-vf", vf, "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "inset_pct": pct,
+        "honesty": "Crop inset = center punch-in %. Not CapCut auto-reframe / tracking.",
+    }
+
+
+def apply_clip_denoise(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 1.5,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Mild hqdn3d denoise. Not CapCut AI denoise / Topaz."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(6.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.3:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "strength": 0.0, "skipped": True}
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    vf = f"hqdn3d={st:.2f}:{st:.2f}:{st * 3:.2f}:{st * 3:.2f}"
+    args = ["-i", str(src), "-vf", vf, "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Denoise = mild hqdn3d. Not CapCut AI denoise / Topaz.",
+    }
+
+
+def apply_clip_deshake(
+    src: Path,
+    out: Path,
+    *,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Mild ffmpeg deshake (if available). Not CapCut warp stabilizer / gyro."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    from content_engine.ffmpeg_util import FFmpegError
+
+    args = ["-i", str(src), "-vf", "deshake", "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    try:
+        run_ffmpeg(args)
+    except FFmpegError as exc:
+        shutil.copy2(src, out)
+        return {
+            "ok": True,
+            "path": str(out),
+            "rel": _rel(out),
+            "skipped": True,
+            "error": str(exc),
+            "honesty": "deshake unavailable — copied unchanged",
+        }
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Deshake = mild ffmpeg deshake. Not CapCut warp stabilizer.",
+    }
+
+
+def apply_clip_opacity(
+    src: Path,
+    out: Path,
+    *,
+    opacity: float = 1.0,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Blend clip over black at opacity 0.15–1.0. Not CapCut multi-layer opacity curves."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    op = max(0.15, min(1.0, float(opacity if opacity is not None else 1.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if op > 0.98:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "opacity": 1.0, "skipped": True}
+    w = int(width or 1080)
+    h = int(height or 1920)
+    dur = max(0.2, float(media_duration_sec(src) or 1.0))
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    fc = (
+        f"color=c=black:s={w}x{h}:d={dur:.3f}[bg];"
+        f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
+        f"format=rgba,colorchannelmixer=aa={op:.3f}[fg];"
+        f"[bg][fg]overlay=0:0:format=auto[v]"
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-t",
+        f"{dur:.3f}",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "opacity": op,
+        "honesty": "Opacity = blend over black. Not CapCut layer opacity keyframes.",
+    }
+
+
+def export_montage_zip() -> dict[str, Any]:
+    """Zip latest edit + thumb + timeline.json into out/export/."""
+    import zipfile
+
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    zpath = EXPORT_DIR / f"montage_pack_{stamp}.zip"
+    thumb = MONTAGE_OUT / "edit_thumb.jpg"
+    if not thumb.is_file():
+        export_montage_thumb()
+    with zipfile.ZipFile(zpath, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(mp4, arcname=mp4.name)
+        if thumb.is_file():
+            zf.write(thumb, arcname=thumb.name)
+        if TIMELINE.is_file():
+            zf.write(TIMELINE, arcname="timeline.json")
+        if PREFS_PATH.is_file():
+            zf.write(PREFS_PATH, arcname="montage_prefs.json")
+        zf.writestr(
+            "README.txt",
+            (
+                "DUP montage pack\n"
+                "honesty: local export zip — not CapCut cloud Space sync.\n"
+                "Upload mp4 manually to TikTok/YT/Reels.\n"
+            ),
+        )
+    return {
+        "ok": zpath.is_file(),
+        "path": str(zpath),
+        "rel": _rel(zpath),
+        "honesty": "Export zip = local pack. Not CapCut Space / cloud project sync.",
+    }
+
+
 def apply_clip_rotate(
     src: Path,
     out: Path,
@@ -1789,6 +2009,42 @@ def render_timeline(
             if lo.get("ok") and not lo.get("skipped"):
                 piece = lp
                 keyframe_notes.append(f"{c.get('name') or i}:loop={loops}")
+        try:
+            inset = float(c.get("inset_pct") or c.get("crop_inset") or 0.0)
+        except (TypeError, ValueError):
+            inset = 0.0
+        if inset >= 1.0:
+            ci = work / f"crop_{i:03d}.mp4"
+            cr = apply_clip_crop_inset(piece, ci, inset_pct=inset, width=width, height=height, fps=fps)
+            if cr.get("ok") and not cr.get("skipped"):
+                piece = ci
+                keyframe_notes.append(f"{c.get('name') or i}:inset={inset:.0f}%")
+        try:
+            denoise = float(c.get("denoise") or 0.0)
+        except (TypeError, ValueError):
+            denoise = 0.0
+        if denoise >= 0.3:
+            dn = work / f"dn_{i:03d}.mp4"
+            dr = apply_clip_denoise(piece, dn, strength=denoise, fps=fps)
+            if dr.get("ok") and not dr.get("skipped"):
+                piece = dn
+                keyframe_notes.append(f"{c.get('name') or i}:denoise={denoise:.1f}")
+        if bool(c.get("deshake")):
+            ds = work / f"ds_{i:03d}.mp4"
+            dsr = apply_clip_deshake(piece, ds, fps=fps)
+            if dsr.get("ok") and not dsr.get("skipped"):
+                piece = ds
+                keyframe_notes.append(f"{c.get('name') or i}:deshake")
+        try:
+            opacity = float(c.get("opacity") if c.get("opacity") is not None else 1.0)
+        except (TypeError, ValueError):
+            opacity = 1.0
+        if opacity < 0.98:
+            op = work / f"op_{i:03d}.mp4"
+            opr = apply_clip_opacity(piece, op, opacity=opacity, width=width, height=height, fps=fps)
+            if opr.get("ok") and not opr.get("skipped"):
+                piece = op
+                keyframe_notes.append(f"{c.get('name') or i}:opacity={opacity:.2f}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
