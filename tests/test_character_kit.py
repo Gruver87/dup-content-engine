@@ -140,6 +140,29 @@ def test_save_prefs_rejects_bad_glb():
     assert bad.get("ok") is False
 
 
+def test_eye_blink_curve():
+    from content_engine.character_kit import eye_open_at_ms
+
+    assert eye_open_at_ms(0) == 1.0
+    assert eye_open_at_ms(1000) == 1.0
+    closed = eye_open_at_ms(2530, period_ms=2600, blink_ms=140)
+    assert closed < 0.5
+
+
+def test_blink_plate(tmp_path: Path):
+    out = tmp_path / "blink.png"
+    render_character_plate(
+        out,
+        width=240,
+        height=426,
+        style="cartoon",
+        speaker="Fox",
+        eye_open=0.1,
+    )
+    assert out.is_file()
+    assert out.stat().st_size > 500
+
+
 def test_roster_and_visemes():
     from content_engine.character_kit import (
         resolve_roster,
@@ -212,11 +235,13 @@ def test_prefs_layout_and_lip(monkeypatch, tmp_path: Path):
     base = default_prefs()
     assert base["layout"] == "pip"
     assert base["lip_animate"] is True
-    out = save_prefs({"layout": "full", "lip_animate": False})
+    assert base["blink_idle"] is True
+    out = save_prefs({"layout": "full", "lip_animate": False, "blink_idle": False})
     assert out.get("ok") is not False
     loaded = load_prefs()
     assert loaded["layout"] == "full"
     assert loaded["lip_animate"] is False
+    assert loaded["blink_idle"] is False
 
 
 def test_morph_target_resolution():

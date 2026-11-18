@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.36 — 2026-11-18
+
+- Character **blink idle**: procedural eye blink frames on talking/idle clips (prefs `blink_idle`)
+- Not face-track / TalkingHead / ARKit — Pillow lids only
+
 ## 0.1.35 — 2026-11-18
 
 - Local **n8n-compatible webhook**: `POST /api/webhook/inbox` → inbox (+ optional approve)

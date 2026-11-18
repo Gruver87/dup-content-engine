@@ -687,6 +687,7 @@ body {
             <span class="chip have" data-i18n="chipHaveStyles">есть style bank</span>
             <span class="chip have" data-i18n="chipHave3d">есть 3D preview</span>
             <span class="chip have" data-i18n="chipHaveLips">есть lip-animate clips</span>
+            <span class="chip have" data-i18n="chipHaveBlink">есть blink idle</span>
             <span class="chip miss" data-i18n="chipMissHeygen">нет photoreal DiT offline</span>
             <span class="chip soon" data-i18n="chipSoonGlb">скоро: TalkingHead + GLB</span>
           </div>
@@ -746,6 +747,7 @@ body {
               <button type="button" class="choice" data-clayout="full"><strong>Full</strong><span class="sub" data-i18n="charLayoutFull">character plate</span></button>
             </div>
             <label class="check" style="margin-top:12px"><input type="checkbox" id="charLipAnimate" checked/> <span data-i18n="charLipAnimate">Lip-animate mouths in clips (rule-based)</span></label>
+            <label class="check" style="margin-top:8px"><input type="checkbox" id="charBlinkIdle" checked/> <span data-i18n="charBlinkIdle">Idle blink in clips (procedural)</span></label>
             <div class="row" style="margin-top:12px">
               <button class="btn" id="btnSaveChars" data-i18n="saveChars">Save character prefs</button>
               <button class="btn ghost" id="btnOpenAvatars" data-i18n="openAvatars">Open avatars/</button>
@@ -1160,6 +1162,7 @@ const I18N = {
     gapCharSub: "Локальный Character Kit + procedural Three.js. Не HeyGen DiT / SadTalker GPU.",
     chipHaveStyles: "есть style bank", chipHave3d: "есть 3D preview",
     chipHaveLips: "есть lip-animate clips",
+    chipHaveBlink: "есть blink idle",
     chipMissHeygen: "нет photoreal DiT offline", chipSoonGlb: "скоро: TalkingHead + GLB",
     charTalk: "Talking clip",
     charPreview: "3D превью", charFallback: "Загрузка 3D…",
@@ -1170,6 +1173,7 @@ const I18N = {
     charLayoutPip: "бюст поверх фона",
     charLayoutFull: "целая плашка",
     charLipAnimate: "Анимация рта в клипах (rule-based)",
+    charBlinkIdle: "Моргание idle в клипах (procedural)",
     charEnabled: "Плейты персонажей в рендере",
     saveChars: "Сохранить персонажей", openAvatars: "Открыть avatars/",
     charGlb: "3D модель (.glb)", charPlate: "Plate PNG",
@@ -1320,6 +1324,7 @@ const I18N = {
     gapCharSub: "Local Character Kit + procedural Three.js. Not HeyGen DiT / SadTalker GPU.",
     chipHaveStyles: "have style bank", chipHave3d: "have 3D preview",
     chipHaveLips: "have lip-animate clips",
+    chipHaveBlink: "have blink idle",
     chipMissHeygen: "no photoreal DiT offline", chipSoonGlb: "soon: TalkingHead + GLB",
     charTalk: "Talking clip",
     charPreview: "3D preview", charFallback: "Loading 3D…",
@@ -1330,6 +1335,7 @@ const I18N = {
     charLayoutPip: "bust over bed",
     charLayoutFull: "character plate",
     charLipAnimate: "Lip-animate mouths in clips (rule-based)",
+    charBlinkIdle: "Idle blink in clips (procedural)",
     charEnabled: "Use character plates in render",
     saveChars: "Save character prefs", openAvatars: "Open avatars/",
     charGlb: "3D model (.glb)", charPlate: "Plate PNG",
@@ -2734,6 +2740,7 @@ async function loadCharacters() {
   charSelectedGlb = prefs.selected_glb || null;
   if ($("charEnabled")) $("charEnabled").checked = prefs.enabled !== false;
   if ($("charLipAnimate")) $("charLipAnimate").checked = prefs.lip_animate !== false;
+  if ($("charBlinkIdle")) $("charBlinkIdle").checked = prefs.blink_idle !== false;
   const grid = $("charStyleGrid");
   if (grid) {
     const styles = CHAR.styles || {};
@@ -2767,6 +2774,7 @@ async function loadCharacters() {
   if ($("charLog")) log($("charLog"), {
     honesty: CHAR.honesty, style: charStyle, layout: charLayout,
     lip_animate: prefs.lip_animate !== false,
+    blink_idle: prefs.blink_idle !== false,
     glb: charSelectedGlb || "procedural", viseme: CHAR.viseme_note,
   });
   initCharPreview();
@@ -2808,6 +2816,7 @@ if (btnSaveChars) btnSaveChars.onclick = async () => {
       enabled: !!$("charEnabled")?.checked,
       layout: charLayout,
       lip_animate: !!$("charLipAnimate")?.checked,
+      blink_idle: !!$("charBlinkIdle")?.checked,
       selected_glb: charSelectedGlb || "procedural",
     }),
   });

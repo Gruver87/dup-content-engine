@@ -288,6 +288,26 @@ def viseme_to_mouth(viseme: str) -> str:
     return _VISEME_TO_MOUTH.get((viseme or "sil").strip(), "line")
 
 
+def eye_open_at_ms(
+    t_ms: int,
+    *,
+    period_ms: int = 2600,
+    blink_ms: int = 140,
+) -> float:
+    """Procedural idle blink: 1.0 open → ~0.05 closed. Not ARKit / face-track."""
+    if period_ms <= 0 or blink_ms <= 0:
+        return 1.0
+    phase = int(t_ms) % int(period_ms)
+    start = int(period_ms) - int(blink_ms)
+    if phase < start:
+        return 1.0
+    half = max(1, int(blink_ms) // 2)
+    mid = start + half
+    if phase <= mid:
+        return max(0.05, 1.0 - (phase - start) / half)
+    return max(0.05, (phase - mid) / max(int(blink_ms) - half, 1))
+
+
 def _mouth_at_ms(visemes: list[dict[str, Any]], t_ms: int) -> str:
     if not visemes:
         return "line"
@@ -436,12 +456,14 @@ def default_prefs() -> dict[str, Any]:
         "selected_glb": None,
         "layout": "pip",
         "lip_animate": True,
+        "blink_idle": True,
         "honesty": (
             "Local Character Kit = Pillow plates + procedural 3D preview. "
             "Not HeyGen Avatar V / Synthesia / SadTalker GPU. "
             "Optional cloud: avatar.py + HEYGEN_API_KEY. "
             "GLB: drop Mixamo-compatible .glb into assets/avatars/ for Three.js preview. "
-            "lip_animate = rule-based mouth frames in mp4 — not ARKit accuracy."
+            "lip_animate = rule-based mouth frames in mp4 — not ARKit accuracy. "
+            "blink_idle = procedural eye blink — not face-track / TalkingHead."
         ),
     }
 
@@ -462,6 +484,8 @@ def load_prefs() -> dict[str, Any]:
                     base["layout"] = str(data["layout"])
                 if "lip_animate" in data:
                     base["lip_animate"] = bool(data["lip_animate"])
+                if "blink_idle" in data:
+                    base["blink_idle"] = bool(data["blink_idle"])
         except (OSError, json.JSONDecodeError):
             pass
     # drop stale glb selection
@@ -482,6 +506,8 @@ def save_prefs(patch: dict[str, Any]) -> dict[str, Any]:
         cur["layout"] = str(patch["layout"])
     if "lip_animate" in patch:
         cur["lip_animate"] = bool(patch["lip_animate"])
+    if "blink_idle" in patch:
+        cur["blink_idle"] = bool(patch["blink_idle"])
     if "selected_glb" in patch:
         rel = patch.get("selected_glb")
         if rel in (None, "", "none", "procedural"):
@@ -607,6 +633,7 @@ def render_character_plate(
     visual_query: str | None = None,
     layout: str = "full",
     mouth_override: str | None = None,
+    eye_open: float = 1.0,
 ) -> Path:
     """Draw a stylized bust plate (Pillow). Not photoreal.
 
@@ -614,6 +641,7 @@ def render_character_plate(
       full — character-centric plate
       pip  — CapCut-ish bust over query-colored bed (lower third)
     mouth_override: smile|frown|o|small|line — lip-animate frames (not ARKit).
+    eye_open: 1.0 fully open … ~0.05 blink closed (procedural idle).
     """
     from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -686,17 +714,34 @@ def render_character_plate(
         draw.ellipse([cx - face_r - er // 2, cy - face_r - er // 3, cx - face_r + er, cy - face_r + er], fill=skin, outline=outline)
         draw.ellipse([cx + face_r - er, cy - face_r - er // 3, cx + face_r + er // 2, cy - face_r + er], fill=skin, outline=outline)
 
-    # eyes
+    # eyes (eye_open < ~0.35 → closed lid line for blink frames)
     eye_w = int(face_r * 0.28 * eye_s)
     eye_h = int(face_r * 0.22 * eye_s)
     ey = cy - int(face_r * 0.08)
+    open_amt = max(0.05, min(1.0, float(eye_open)))
     for side in (-1, 1):
         ex = cx + side * int(face_r * 0.38)
-        draw.ellipse([ex - eye_w, ey - eye_h, ex + eye_w, ey + eye_h], fill=(250, 250, 255), outline=outline, width=2)
-        iris_r = max(3, int(eye_h * 0.55))
-        iris = (40, 80, 140) if key != "mascot" else (40, 40, 40)
-        draw.ellipse([ex - iris_r, ey - iris_r, ex + iris_r, ey + iris_r], fill=iris)
-        draw.ellipse([ex - iris_r // 3, ey - iris_r // 2, ex + iris_r // 4, ey], fill=(255, 255, 255))
+        if open_amt < 0.35:
+            draw.line(
+                [ex - eye_w, ey, ex + eye_w, ey],
+                fill=outline,
+                width=max(3, face_r // 14),
+            )
+        else:
+            eh = max(2, int(eye_h * open_amt))
+            draw.ellipse(
+                [ex - eye_w, ey - eh, ex + eye_w, ey + eh],
+                fill=(250, 250, 255),
+                outline=outline,
+                width=2,
+            )
+            iris_r = max(3, int(eh * 0.55))
+            iris = (40, 80, 140) if key != "mascot" else (40, 40, 40)
+            draw.ellipse([ex - iris_r, ey - iris_r, ex + iris_r, ey + iris_r], fill=iris)
+            draw.ellipse(
+                [ex - iris_r // 3, ey - iris_r // 2, ex + iris_r // 4, ey],
+                fill=(255, 255, 255),
+            )
 
     # brows / cheeks / mouth by emotion (mouth_override for lip-animate frames)
     emo = (emotion or "neutral").strip().lower()
@@ -770,11 +815,13 @@ def make_character_clip(
     layout: str | None = None,
     text: str | None = None,
     lip_animate: bool | None = None,
+    blink_idle: bool | None = None,
 ) -> tuple[Path, AssetLicense]:
     """PNG plate → short H.264 clip for the pipeline (default PIP over query bed).
 
     When ``text`` + ``lip_animate``, render a short mouth-shape frame sequence from
     rule-based visemes (not ARKit / HeyGen lip accuracy).
+    ``blink_idle`` adds procedural eye blink frames (not face-track / TalkingHead).
     """
     out_mp4.parent.mkdir(parents=True, exist_ok=True)
     plate = out_mp4.with_suffix(".png")
@@ -784,26 +831,34 @@ def make_character_clip(
     if layout_key not in {"full", "pip"}:
         layout_key = "pip"
     do_lips = bool(prefs.get("lip_animate", True) if lip_animate is None else lip_animate)
+    do_blink = bool(prefs.get("blink_idle", True) if blink_idle is None else blink_idle)
     dialogue = (text or "").strip()
     use_lips = do_lips and bool(dialogue)
 
     dur = max(0.5, duration_sec)
     fade_out = max(0.0, dur - 0.28)
     anim_tag = "still"
+    # blink alone only worth frames if clip long enough to show ≥1 blink
+    use_blink_frames = do_blink and (use_lips or dur >= 1.2)
+    use_anim_frames = use_lips or use_blink_frames
 
-    if use_lips:
-        visemes = text_to_visemes(dialogue)
+    if use_anim_frames:
+        visemes = text_to_visemes(dialogue) if use_lips else []
         frames_dir = out_mp4.parent / f"{out_mp4.stem}_frames"
         frames_dir.mkdir(parents=True, exist_ok=True)
         anim_fps = 8
-        n_frames = max(2, min(40, int(dur * anim_fps)))
+        n_frames = max(2, min(48, int(dur * anim_fps)))
         frame_paths: list[Path] = []
-        last_mouth: str | None = None
+        last_key: tuple[str, float] | None = None
         last_path: Path | None = None
+        default_mouth = _EMOTION_MOUTH.get((emotion or "neutral").strip().lower(), "line")
         for i in range(n_frames):
             t_ms = int((i / max(n_frames, 1)) * dur * 1000)
-            mouth = _mouth_at_ms(visemes, t_ms)
-            if mouth == last_mouth and last_path is not None:
+            mouth = _mouth_at_ms(visemes, t_ms) if use_lips else default_mouth
+            eye = eye_open_at_ms(t_ms) if do_blink else 1.0
+            eye_q = round(eye, 1)
+            cache_key = (mouth, eye_q)
+            if cache_key == last_key and last_path is not None:
                 frame_paths.append(last_path)
                 continue
             fp = frames_dir / f"f_{i:03d}.png"
@@ -817,15 +872,14 @@ def make_character_clip(
                 gender=gender,
                 visual_query=visual_query,
                 layout=layout_key,
-                mouth_override=mouth,
+                mouth_override=mouth if use_lips else None,
+                eye_open=eye_q,
             )
             frame_paths.append(fp)
-            last_mouth = mouth
+            last_key = cache_key
             last_path = fp
-        # representative still (mid open-ish)
         mid = frame_paths[min(len(frame_paths) // 2, len(frame_paths) - 1)]
         plate.write_bytes(mid.read_bytes())
-        # concat demuxer with equal slice durations
         slice_dur = dur / max(len(frame_paths), 1)
         lst = frames_dir / "concat.txt"
         lines: list[str] = []
@@ -860,7 +914,13 @@ def make_character_clip(
                 str(out_mp4),
             ]
         )
-        anim_tag = f"lips:{len({p.name for p in frame_paths})}shapes"
+        unique = len({p.name for p in frame_paths})
+        parts = []
+        if use_lips:
+            parts.append(f"lips:{unique}")
+        if do_blink:
+            parts.append("blink")
+        anim_tag = "+".join(parts) if parts else f"frames:{unique}"
     else:
         render_character_plate(
             plate,
