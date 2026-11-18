@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.43 — 2026-11-18
+
+- Montage **mirror** (h / v / hv) on stitch — not CapCut 3D flip
+- Console Timeline: Flip H / Flip V
+
 ## 0.1.42 — 2026-11-18
 
 - Montage **freeze** hold (`freeze_sec`) appends still frame on stitch — not CapCut freeze+ramp

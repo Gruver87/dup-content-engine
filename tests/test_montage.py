@@ -4,6 +4,7 @@ from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
     apply_clip_freeze,
     apply_clip_keyframes,
+    apply_clip_mirror,
     apply_clip_overlay_text,
     apply_clip_speed,
     apply_clip_volume,
@@ -142,6 +143,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     fz = apply_clip_freeze(src, frz, hold_sec=0.5, width=320, height=560, fps=12)
     assert fz["ok"] is True and Path(fz["path"]).is_file()
     assert media_duration_sec(frz) > media_duration_sec(src)
+
+    mir = out / "mir.mp4"
+    mh = apply_clip_mirror(src, mir, mirror="h", fps=12)
+    assert mh["ok"] is True and mh.get("mirror") == "h"
+    assert Path(mh["path"]).is_file()
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

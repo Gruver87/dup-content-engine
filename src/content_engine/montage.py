@@ -884,6 +884,45 @@ def apply_clip_overlay_text(
     }
 
 
+def apply_clip_mirror(
+    src: Path,
+    out: Path,
+    *,
+    mirror: str = "h",
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Flip clip: h / v / hv (ffmpeg hflip/vflip).
+
+    Honesty: simple mirror — not CapCut 3D flip / perspective craft.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    key = (mirror or "h").strip().lower().replace("horizontal", "h").replace("vertical", "v")
+    if key in {"both", "hv", "vh", "xy"}:
+        key = "hv"
+    if key not in {"h", "v", "hv"}:
+        return {"ok": False, "error": "mirror must be h, v, or hv"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    filters = {"h": "hflip", "v": "vflip", "hv": "hflip,vflip"}[key]
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = ["-i", str(src), "-vf", filters, "-r", str(fps), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "mirror": key,
+        "honesty": "Clip mirror = hflip/vflip. Not CapCut 3D flip / perspective.",
+    }
+
+
 def apply_clip_freeze(
     src: Path,
     out: Path,
@@ -1222,6 +1261,19 @@ def render_timeline(
             if fr.get("ok"):
                 piece = fz
                 keyframe_notes.append(f"{c.get('name') or i}:freeze={freeze_sec:.2f}s")
+        mirror = str(c.get("mirror") or "").strip().lower()
+        if c.get("flip_h") and c.get("flip_v"):
+            mirror = "hv"
+        elif c.get("flip_h"):
+            mirror = mirror or "h"
+        elif c.get("flip_v"):
+            mirror = mirror or "v"
+        if mirror in {"h", "v", "hv", "vh"}:
+            mir = work / f"mir_{i:03d}.mp4"
+            mr = apply_clip_mirror(piece, mir, mirror=mirror, fps=fps)
+            if mr.get("ok"):
+                piece = mir
+                keyframe_notes.append(f"{c.get('name') or i}:mirror={mr.get('mirror', mirror)}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
