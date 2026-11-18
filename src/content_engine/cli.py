@@ -111,6 +111,31 @@ def build_parser() -> argparse.ArgumentParser:
     ig.add_argument("--video-url", type=str, default=None, help="Public HTTPS URL for Graph")
     ig.add_argument("--dry-run", action="store_true")
 
+    tt = sub.add_parser("tiktok", help="TikTok Content Posting API (official inbox/direct)")
+    tt.add_argument("mp4", type=Path)
+    tt.add_argument("--pack", type=Path, required=True)
+    tt.add_argument("--mode", choices=["inbox", "direct"], default="inbox")
+    tt.add_argument("--caption", type=str, default="")
+    tt.add_argument("--dry-run", action="store_true")
+
+    an = sub.add_parser("analytics", help="Ingest real CSV/JSON metrics (never invents views)")
+    an.add_argument("path", type=Path)
+    an.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "analytics" / "summary.json")
+
+    clip = sub.add_parser("clip", help="Long-form → Shorts candidates (loudness / optional whisper)")
+    clip.add_argument("source", type=Path)
+    clip.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "clips")
+    clip.add_argument("--window-sec", type=float, default=30.0)
+    clip.add_argument("--top-k", type=int, default=5)
+    clip.add_argument("--no-whisper", action="store_true")
+
+    av = sub.add_parser("avatar", help="Optional HeyGen-class avatar (not required for demo)")
+    av.add_argument("--text", type=str, default=None, help="Spoken script text")
+    av.add_argument("--script", type=Path, default=None, help="Or script.json (concat scene texts)")
+    av.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "avatar")
+    av.add_argument("--dry-run", action="store_true")
+    av.add_argument("--provider", type=str, default=None)
+
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
 
@@ -131,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
             "policy": str(DEFAULT_POLICY),
             "brand": str(DEFAULT_BRAND),
             "assets": str(PACKAGE_ROOT / "assets"),
-            "note": "ALLOW ≠ growth; TikTok manual; YT/IG official APIs",
+            "note": "ALLOW ≠ growth; TikTok/YT/IG official APIs only — no cookie bots",
         }
         print(json.dumps(info, indent=2))
         return 0
@@ -301,6 +326,62 @@ def main(argv: list[str] | None = None) -> int:
             video_url=args.video_url,
             dry_run=args.dry_run,
             audit_path=PACKAGE_ROOT / "audit.jsonl",
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "tiktok":
+        from content_engine.tiktok_publish import tiktok_publish
+
+        result = tiktok_publish(
+            args.mp4,
+            pack_path=args.pack,
+            mode=args.mode,
+            dry_run=args.dry_run,
+            caption=args.caption,
+            audit_path=PACKAGE_ROOT / "audit.jsonl",
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "analytics":
+        from content_engine.analytics import summarize_analytics
+
+        result = summarize_analytics(args.path, out_path=args.out)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "clip":
+        from content_engine.clipper import clip_longform
+
+        if not args.source.is_file():
+            print(f"source missing: {args.source}", file=sys.stderr)
+            return 2
+        result = clip_longform(
+            args.source,
+            args.out,
+            window_sec=args.window_sec,
+            top_k=args.top_k,
+            prefer_whisper=not args.no_whisper,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("candidates") else 1
+
+    if args.cmd == "avatar":
+        from content_engine.avatar import avatar_render
+
+        text = args.text or ""
+        if args.script and args.script.is_file():
+            script = load_script(args.script)
+            text = " ".join(s.text for s in script.scenes)
+        if not text.strip() and not args.dry_run:
+            print("Provide --text or --script", file=sys.stderr)
+            return 2
+        result = avatar_render(
+            text or "dry-run placeholder",
+            out_dir=args.out,
+            dry_run=args.dry_run,
+            provider=args.provider,
         )
         print(json.dumps(result, indent=2))
         return 0 if result.get("ok") else 1

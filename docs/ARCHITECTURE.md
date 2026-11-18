@@ -54,3 +54,7 @@ ASS burn may fall back to sidecar `.ass` when libass is unavailable; that is rec
 - Brand + music: `brand.py`, `audio_bed.py` via `configs/brand.toml`
 - Batch A/B + hook heuristic: `batch.py`, `hook_score.py`
 - Preview: `preview.py` → local HTML
+- TikTok official: `tiktok_publish.py` (inbox/direct)
+- Analytics ingest: `analytics.py` (real exports only)
+- Long→short: `clipper.py` (loudness / optional whisper)
+- Avatar adapter: `avatar.py` (optional, not demo-blocking)

@@ -74,6 +74,10 @@ Artifacts land under `out/demo/`:
 | `dup-content preview --out out/demo` | Local HTML preview |
 | `dup-content youtube video.mp4 --pack …` | Official YouTube upload (`--dry-run` safe) |
 | `dup-content instagram video.mp4 --pack …` | Official IG Reels (`--dry-run` / `--video-url`) |
+| `dup-content tiktok video.mp4 --pack …` | Official TikTok inbox/direct (`--dry-run`) |
+| `dup-content analytics export.csv` | Ingest real metrics (never invents views) |
+| `dup-content clip long.mp4` | Long→Shorts candidates |
+| `dup-content avatar --dry-run` | Optional HeyGen-class presenter |
 
 ## Policy
 

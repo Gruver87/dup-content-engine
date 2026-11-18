@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 — 2026-11-18
+
+P2 extensions:
+
+- `dup-content tiktok` — official Content Posting API (inbox draft default; direct opt-in)
+- `dup-content analytics` — ingest real CSV/JSON metrics only (no invented views)
+- `dup-content clip` — long→Shorts candidates (loudness windows; optional faster-whisper)
+- `dup-content avatar` — optional HeyGen-class adapter (never required for demo green)
+
 ## 0.1.3 — 2026-11-18
 
 P1 channel ops:

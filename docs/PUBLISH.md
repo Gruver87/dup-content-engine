@@ -22,6 +22,20 @@ Requires `client_secrets.json` (Google Cloud OAuth desktop client) and writes `t
 Successful upload appends `publish_allow` to `audit.jsonl` (counts toward daily cap).  
 Refuse upload if pack gate is not ALLOW. There is no Shorts-specific endpoint — vertical ≤3 min becomes a Short.
 
+## TikTok (official Content Posting API)
+
+```bash
+# Validate pack + env (no API call):
+python -m content_engine tiktok out/demo/VIDEO.mp4 --pack out/demo/verified_pack_….json --dry-run
+# Draft into creator inbox (scope video.upload):
+# set TIKTOK_ACCESS_TOKEN=…
+python -m content_engine tiktok out/demo/VIDEO.mp4 --pack … --mode inbox
+# Direct post (scope video.publish) — TikTok may force private until app audit:
+python -m content_engine tiktok out/demo/VIDEO.mp4 --pack … --mode direct
+```
+
+No Playwright. No cookie bots. Prefer `inbox` until your TikTok developer app is audited.
+
 ## Instagram Reels (official Graph API)
 
 ```bash

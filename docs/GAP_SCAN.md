@@ -29,9 +29,9 @@ Script JSON, README teaser, edge-tts, synthetic/Pexels stub, FFmpeg bundle, ASS 
 
 Brand kit / endcard · music bed · batch A/B · hook heuristic · local preview · Instagram Reels (official / dry-run)
 
-## P2 — later
+## P2 — shipped in 0.1.4
 
-TikTok Content Posting API (after app audit) · analytics ingest · long→short clipper · AI avatar adapters
+TikTok Content Posting API (inbox default / direct opt-in) · analytics ingest · long→short clipper · AI avatar adapter (optional)
 
 ## Refuse (keep)
 
