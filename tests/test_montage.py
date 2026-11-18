@@ -3,6 +3,7 @@ from pathlib import Path
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
     apply_clip_keyframes,
+    apply_clip_overlay_text,
     apply_clip_speed,
     apply_clip_volume,
     concat_clips,
@@ -127,6 +128,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     quiet = out / "quiet.mp4"
     qv = apply_clip_volume(src, quiet, volume=0.25)
     assert qv["ok"] is True and abs(float(qv["volume"]) - 0.25) < 0.01
+
+    txt = out / "txt.mp4"
+    tr = apply_clip_overlay_text(src, txt, text="Hook title", width=320, height=560)
+    assert tr["ok"] is True and Path(tr["path"]).is_file()
+    assert "CapCut" in (tr.get("honesty") or "")
 
 
 def test_transitions_pack_and_fade(tmp_path, monkeypatch):

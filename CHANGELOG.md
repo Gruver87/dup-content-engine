@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.40 — 2026-11-18
+
+- Montage **overlay text** burn-in per clip (Pillow) — not CapCut animated titles
+- Console Timeline: Overlay text field
+
 ## 0.1.39 — 2026-11-18
 
 - Montage **volume / mute** per clip on stitch (constant gain) — not CapCut audio envelopes

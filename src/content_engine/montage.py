@@ -715,6 +715,126 @@ def apply_clip_speed(
     }
 
 
+def apply_clip_overlay_text(
+    src: Path,
+    out: Path,
+    *,
+    text: str,
+    width: int | None = None,
+    height: int | None = None,
+    style_name: str = "boxed",
+) -> dict[str, Any]:
+    """Burn a short title/overlay onto one clip (Pillow + ffmpeg overlay).
+
+    Keeps audio when present. Honesty: not CapCut multi-layer text templates / animations.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    body = (text or "").strip()
+    if not body:
+        return {"ok": False, "error": "overlay text empty"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    from PIL import Image, ImageDraw, ImageFont
+
+    from content_engine.caption_burn import find_font
+    from content_engine.caption_styles import resolve_style
+    from content_engine.ffmpeg_util import FFmpegError
+
+    # probe size from first frame if not given
+    w = int(width or 1080)
+    h = int(height or 1920)
+    style = resolve_style(style_name)
+    font_path = find_font()
+    size = max(28, w // 18)
+    try:
+        font = ImageFont.truetype(str(font_path), size) if font_path else ImageFont.load_default()
+    except OSError:
+        font = ImageFont.load_default()
+
+    # wrap ~28 chars
+    words = body.replace("\n", " ").split()
+    lines: list[str] = []
+    cur = ""
+    for word in words:
+        trial = f"{cur} {word}".strip()
+        if len(trial) > 28 and cur:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    lines = lines[:3] or [body[:28]]
+
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    line_h = size + 12
+    block_h = line_h * len(lines) + 20
+    bar_top = int(h * 0.72) - block_h
+    pad = max(24, w // 24)
+    if style.get("box") or style.get("bar_alpha"):
+        alpha = int(style.get("bar_alpha") or 170)
+        draw.rounded_rectangle(
+            [(pad // 2, bar_top), (w - pad // 2, bar_top + block_h + 8)],
+            radius=16,
+            fill=(0, 0, 0, alpha),
+        )
+    y = bar_top + 12
+    fill = (255, 255, 255, 255)
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        tw = bbox[2] - bbox[0]
+        x = max(pad, (w - tw) // 2)
+        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            draw.text((x + dx, y + dy), line, font=font, fill=(0, 0, 0, 230))
+        draw.text((x, y), line, font=font, fill=fill)
+        y += line_h
+
+    png = out.with_suffix(".overlay.png")
+    overlay.save(png)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-i",
+        str(png),
+        "-filter_complex",
+        "[0:v][1:v]overlay=0:0[v]",
+        "-map",
+        "[v]",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    try:
+        run_ffmpeg(args)
+    except FFmpegError as exc:
+        png.unlink(missing_ok=True)
+        return {"ok": False, "error": str(exc)}
+    png.unlink(missing_ok=True)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "text": body[:80],
+        "style": style_name,
+        "honesty": (
+            "Clip overlay text = Pillow burn-in on stitch. "
+            "Not CapCut animated text templates / multi-layer titles."
+        ),
+    }
+
+
 def apply_clip_volume(
     src: Path,
     out: Path,
@@ -945,6 +1065,20 @@ def render_timeline(
                 keyframe_notes.append(
                     f"{c.get('name') or i}:fi={fade_in:.2f}/fo={fade_out:.2f}/z={zoom:.2f}"
                 )
+        overlay_text = str(c.get("overlay_text") or c.get("text") or "").strip()
+        if overlay_text:
+            ox = work / f"txt_{i:03d}.mp4"
+            ot = apply_clip_overlay_text(
+                piece,
+                ox,
+                text=overlay_text,
+                width=width,
+                height=height,
+                style_name=str(c.get("overlay_style") or "boxed"),
+            )
+            if ot.get("ok"):
+                piece = ox
+                keyframe_notes.append(f"{c.get('name') or i}:text={overlay_text[:24]}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
