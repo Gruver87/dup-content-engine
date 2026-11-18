@@ -33,6 +33,14 @@ Brand kit / endcard · music bed · batch A/B · hook heuristic · local preview
 
 TikTok Content Posting API (inbox default / direct opt-in) · analytics ingest · long→short clipper · AI avatar adapter (optional)
 
+## P3 — shipped in 0.1.5 (offline / keys-later)
+
+SRT + thumbnail · local calendar · multi-aspect reframe · stronger gate/verify · optional MCP
+
 ## Refuse (keep)
 
 Cookie bots · donor scrape · virality-as-guarantee · ALLOW-as-growth · trading auto-post as “content”
+
+## Keys later
+
+Wire YT / TikTok / IG / ElevenLabs / Pexels only when ready — engine stays demo-green offline.

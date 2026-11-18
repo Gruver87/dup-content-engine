@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dup-content-engine"
-version = "0.1.4"
+version = "0.1.5"
 description = "Fail-closed laptop media pipeline: script → TTS → stock/synth visuals → FFmpeg → evidence pack"
 readme = "README.md"
 license = { text = "MIT" }
@@ -39,9 +39,11 @@ youtube = ["google-api-python-client>=2.100.0", "google-auth-oauthlib>=1.2.0"]
 voice = []  # ElevenLabs/Azure use httpx + env keys; no extra package required
 whisper = ["faster-whisper>=1.0.0"]
 avatar = []  # HeyGen uses httpx + HEYGEN_API_KEY
+mcp = ["mcp>=1.0.0"]
 
 [project.scripts]
 dup-content = "content_engine.cli:main"
+dup-content-mcp = "content_engine.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/Gruver87/dup-content-engine"

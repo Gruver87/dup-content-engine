@@ -136,6 +136,28 @@ def build_parser() -> argparse.ArgumentParser:
     av.add_argument("--dry-run", action="store_true")
     av.add_argument("--provider", type=str, default=None)
 
+    cal = sub.add_parser("calendar", help="Local content calendar from topics (no publish)")
+    cal.add_argument(
+        "topics",
+        type=Path,
+        nargs="?",
+        default=PACKAGE_ROOT / "topics.example.txt",
+    )
+    cal.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "calendar")
+    cal.add_argument("--start", type=str, default=None, help="YYYY-MM-DD UTC")
+    cal.add_argument("--per-day", type=int, default=1)
+    cal.add_argument("--gap-hours", type=float, default=3.0)
+
+    asp = sub.add_parser("aspects", help="Reframe master mp4 to 9:16 / 1:1 / 16:9")
+    asp.add_argument("mp4", type=Path)
+    asp.add_argument("--out", type=Path, default=None)
+    asp.add_argument("--list", default="9:16,1:1,16:9")
+
+    thumb = sub.add_parser("thumb", help="Build cover JPG from an mp4 + title")
+    thumb.add_argument("mp4", type=Path)
+    thumb.add_argument("--title", type=str, default=None)
+    thumb.add_argument("--out", type=Path, default=None)
+
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
 
@@ -385,6 +407,49 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(result, indent=2))
         return 0 if result.get("ok") else 1
+
+    if args.cmd == "calendar":
+        from content_engine.calendar import build_calendar
+
+        result = build_calendar(
+            args.topics,
+            out_dir=args.out,
+            start_date=args.start,
+            per_day=args.per_day,
+            gap_hours=args.gap_hours,
+        )
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "aspects":
+        from content_engine.aspect import export_aspects
+
+        if not args.mp4.is_file():
+            print(f"mp4 missing: {args.mp4}", file=sys.stderr)
+            return 2
+        out = args.out or (args.mp4.parent / "aspects")
+        aspects = [a.strip() for a in args.list.split(",") if a.strip()]
+        result = export_aspects(args.mp4, out, aspects=aspects)
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("ok") else 1
+
+    if args.cmd == "thumb":
+        from content_engine.brand import load_brand
+        from content_engine.pipeline import DEFAULT_BRAND
+        from content_engine.thumbnail import make_thumbnail
+
+        if not args.mp4.is_file():
+            print(f"mp4 missing: {args.mp4}", file=sys.stderr)
+            return 2
+        out = args.out or args.mp4.with_suffix(".thumb.jpg")
+        path = make_thumbnail(
+            args.mp4,
+            out,
+            title=args.title or args.mp4.stem,
+            brand=load_brand(DEFAULT_BRAND),
+        )
+        print(json.dumps({"ok": True, "thumbnail": str(path)}, indent=2))
+        return 0
 
     return 2
 

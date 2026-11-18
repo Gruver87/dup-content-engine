@@ -24,6 +24,8 @@ from content_engine.hook_score import score_script
 from content_engine.models import RunReport, SceneTiming, Script
 from content_engine.policy import load_policy
 from content_engine.render import concat_audio, mux_final
+from content_engine.srt_builder import build_srt
+from content_engine.thumbnail import make_thumbnail
 from content_engine.visuals import AssetLicense, make_scene_clip
 from content_engine.voice import synthesize_scene, write_durations
 
@@ -205,9 +207,23 @@ def run_pipeline(
     final_mp4 = out_dir / f"{run_id}.mp4"
     mux_final(timings, voice_for_mux, final_mp4, fps=fps, work_dir=work)
     shutil.copy2(captions, out_dir / f"{run_id}.ass")
+    srt_path = build_srt(script.scenes, timings, out_dir / f"{run_id}.srt")
+    notes.append(f"srt={srt_path.name}")
     (out_dir / f"{run_id}.hook_score.json").write_text(
         json.dumps(hook, indent=2) + "\n", encoding="utf-8"
     )
+
+    thumb_path = None
+    try:
+        thumb_path = make_thumbnail(
+            final_mp4,
+            out_dir / f"{run_id}.thumb.jpg",
+            title=script.title,
+            brand=brand,
+        )
+        notes.append(f"thumb={thumb_path.name}")
+    except Exception as exc:  # noqa: BLE001
+        notes.append(f"thumb_skip: {exc}")
 
     audit = PACKAGE_ROOT / "audit.jsonl"
     gate = evaluate_gate(
@@ -227,7 +243,12 @@ def run_pipeline(
                 gate=gate,
                 run_id=run_id,
                 licenses=licenses,
-                extra={"hook_score": hook, "brand": (brand.get("brand") or {}).get("name")},
+                extra={
+                    "hook_score": hook,
+                    "brand": (brand.get("brand") or {}).get("name"),
+                    "srt": str(srt_path),
+                    "thumbnail": str(thumb_path) if thumb_path else None,
+                },
             )
         )
         (out_dir / f"{run_id}.script.json").write_text(

@@ -58,3 +58,6 @@ ASS burn may fall back to sidecar `.ass` when libass is unavailable; that is rec
 - Analytics ingest: `analytics.py` (real exports only)
 - Long→short: `clipper.py` (loudness / optional whisper)
 - Avatar adapter: `avatar.py` (optional, not demo-blocking)
+- SRT + thumbnail: `srt_builder.py`, `thumbnail.py`
+- Calendar / aspects: `calendar.py`, `aspect.py`
+- Optional MCP: `mcp_server.py` (`dup-content-mcp`)

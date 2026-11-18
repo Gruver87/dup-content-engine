@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "dup-content-engine": {
+      "command": "python",
+      "args": ["-m", "content_engine.mcp_server"],
+      "env": {}
+    }
+  }
+}

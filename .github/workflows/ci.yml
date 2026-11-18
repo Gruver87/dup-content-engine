@@ -20,5 +20,10 @@ jobs:
       - name: Offline demo gate
         run: |
           python -m content_engine doctor
+          python -m content_engine score fixtures/demo_script.json
+          python -m content_engine analytics fixtures/analytics.example.csv --out out/analytics/summary.json
+          python -m content_engine calendar topics.example.txt --out out/calendar
           python -m content_engine demo --out out/demo --offline-tts
           test -n "$(ls out/demo/verified_pack_*.json 2>/dev/null | head -n1)"
+          test -n "$(ls out/demo/*.srt 2>/dev/null | head -n1)"
+          test -n "$(ls out/demo/*.thumb.jpg 2>/dev/null | head -n1)"

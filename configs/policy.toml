@@ -19,6 +19,8 @@ audio_required = true
 max_silence_db = -40.0
 # Laptop mux + ASS fallback can drift a bit vs summed TTS
 duration_slack_sec = 2.0
+require_resolution = false
+require_portrait = true
 
 [voice]
 # provider: edge | elevenlabs | azure | offline

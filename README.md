@@ -78,6 +78,10 @@ Artifacts land under `out/demo/`:
 | `dup-content analytics export.csv` | Ingest real metrics (never invents views) |
 | `dup-content clip long.mp4` | Long→Shorts candidates |
 | `dup-content avatar --dry-run` | Optional HeyGen-class presenter |
+| `dup-content calendar topics.txt` | Local publish plan (no keys / no post) |
+| `dup-content aspects video.mp4` | Reframe to 9:16 / 1:1 / 16:9 |
+| `dup-content thumb video.mp4` | Cover JPG |
+| `dup-content-mcp` | Optional Cursor MCP (`pip install '.[mcp]'`) |
 
 ## Policy
 

@@ -71,10 +71,40 @@ def evaluate_gate(
     probe = probe_json(mp4) if exists else {}
     streams = probe.get("streams") or []
     has_audio = any(s.get("codec_type") == "audio" for s in streams)
-    has_video = any(s.get("codec_type") == "video" for s in streams)
+    video_streams = [s for s in streams if s.get("codec_type") == "video"]
+    has_video = len(video_streams) > 0
     if media.get("audio_required", True):
         checks.append(_check("audio_stream", has_audio, "audio required"))
     checks.append(_check("video_stream", has_video, "video required"))
+
+    # Resolution / portrait aspect (soft unless policy sets require_resolution)
+    expect_w = int(media.get("width") or 1080)
+    expect_h = int(media.get("height") or 1920)
+    vw = vh = None
+    if video_streams:
+        vw = video_streams[0].get("width")
+        vh = video_streams[0].get("height")
+    res_ok = True
+    res_detail = "unprobed"
+    if vw and vh:
+        res_ok = int(vw) == expect_w and int(vh) == expect_h
+        res_detail = f"{vw}x{vh} expect={expect_w}x{expect_h}"
+        # Accept near-miss from re-encodes (±2px) as soft ok
+        if abs(int(vw) - expect_w) <= 2 and abs(int(vh) - expect_h) <= 2:
+            res_ok = True
+    hard_res = bool(media.get("require_resolution", False))
+    checks.append(_check("resolution", res_ok if vw else True, res_detail, hard=hard_res))
+    if vw and vh:
+        portrait = int(vh) >= int(vw)
+        expect_portrait = expect_h >= expect_w
+        checks.append(
+            _check(
+                "aspect_orientation",
+                portrait == expect_portrait,
+                f"portrait={portrait} expect_portrait={expect_portrait}",
+                hard=bool(media.get("require_portrait", True)),
+            )
+        )
 
     blob = " ".join(
         [script.title, script.description, *[s.text for s in script.scenes]]

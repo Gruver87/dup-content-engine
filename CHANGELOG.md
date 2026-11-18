@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.5 — 2026-11-18
+
+Offline channel kit (no API keys required):
+
+- SRT sidecar + branded thumbnail on every run
+- `calendar` — local content plan from topics
+- `aspects` — reframe master to 9:16 / 1:1 / 16:9
+- Gate: portrait orientation (+ optional hard resolution)
+- Optional MCP server: `dup-content-mcp` / `pip install '.[mcp]'`
+- Stronger `scripts/verify.*` (score, analytics, calendar, srt, thumb, preview)
+
 ## 0.1.4 — 2026-11-18
 
 P2 extensions:

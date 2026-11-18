@@ -77,13 +77,21 @@ def probe_json(path: Path) -> dict:
         duration = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
     has_audio = "Audio:" in err
     has_video = "Video:" in err
+    width = height = None
+    vm = re.search(r"Video:.*?(\d{2,5})x(\d{2,5})", err)
+    if vm:
+        width, height = int(vm.group(1)), int(vm.group(2))
+    video_stream: dict = {"codec_type": "video"}
+    if width and height:
+        video_stream["width"] = width
+        video_stream["height"] = height
     return {
         "format": {
             "duration": str(duration),
             "size": str(path.stat().st_size if path.is_file() else 0),
         },
         "streams": [
-            *([{"codec_type": "video"}] if has_video else []),
+            *([video_stream] if has_video else []),
             *([{"codec_type": "audio"}] if has_audio else []),
         ],
         "_fallback": True,
