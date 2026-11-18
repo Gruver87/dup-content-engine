@@ -67,6 +67,7 @@ Artifacts land under `out/demo/`:
 | `dup-content run script.json` | Custom script |
 | `dup-content gate video.mp4 --script …` | Re-check only |
 | `dup-content export video.mp4` | Copy to drop folder for manual TikTok/YT |
+| `dup-content teaser README.md` | README → ~30s teaser + optional `--export` |
 
 ## Policy
 

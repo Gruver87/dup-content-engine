@@ -56,6 +56,20 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--pack", type=Path, default=None)
     exp.add_argument("--dest", type=Path, default=PACKAGE_ROOT / "out" / "export")
 
+    teaser = sub.add_parser(
+        "teaser",
+        help="README.md → ~30s vertical teaser (script + pipeline + optional export)",
+    )
+    teaser.add_argument("readme", type=Path, help="Path to project README.md")
+    teaser.add_argument("--out", type=Path, default=PACKAGE_ROOT / "out" / "teaser")
+    teaser.add_argument("--target-sec", type=float, default=30.0)
+    teaser.add_argument("--name", type=str, default=None, help="Override project name")
+    teaser.add_argument("--script-only", action="store_true", help="Write script.json only")
+    teaser.add_argument("--export", action="store_true", help="Copy ALLOW mp4 to export drop")
+    teaser.add_argument("--offline-tts", action="store_true")
+    teaser.add_argument("--keep-workspace", action="store_true")
+    teaser.add_argument("--policy", type=Path, default=DEFAULT_POLICY)
+
     sub.add_parser("doctor", help="Show toolchain + paths")
     return p
 
@@ -114,6 +128,45 @@ def main(argv: list[str] | None = None) -> int:
         copied = export_ready(args.mp4, args.pack, args.dest)
         print(json.dumps(copied, indent=2))
         return 0
+
+    if args.cmd == "teaser":
+        from content_engine.readme_teaser import readme_to_script, teaser_meta, write_script
+
+        if not args.readme.is_file():
+            print(f"README not found: {args.readme}", file=sys.stderr)
+            return 2
+        script = readme_to_script(
+            args.readme, target_sec=args.target_sec, project_name=args.name
+        )
+        args.out.mkdir(parents=True, exist_ok=True)
+        script_path = args.out / "teaser_script.json"
+        write_script(script, script_path)
+        meta = teaser_meta(script, args.target_sec)
+        print(json.dumps({"script": str(script_path), "meta": meta}, indent=2))
+        if args.script_only:
+            return 0
+        report = run_pipeline(
+            script_path,
+            work_dir=PACKAGE_ROOT / "workspace",
+            out_dir=args.out,
+            policy_path=args.policy,
+            allow_network_tts=not args.offline_tts,
+            keep_workspace=args.keep_workspace,
+        )
+        print(json.dumps(report.to_dict(), indent=2))
+        print(
+            f"\nRESULT: {'ALLOW' if report.ok else 'REFUSE'} → {report.output_mp4}",
+            file=sys.stderr,
+        )
+        if report.ok and args.export and report.output_mp4:
+            copied = export_ready(
+                Path(report.output_mp4),
+                Path(report.pack_path) if report.pack_path else None,
+                args.out / "export",
+                script_path=script_path,
+            )
+            print(json.dumps({"export": copied}, indent=2))
+        return 0 if report.ok else 1
 
     return 2
 
