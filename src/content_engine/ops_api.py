@@ -291,6 +291,114 @@ def save_inbox_script(data: dict[str, Any] | str, *, name: str | None = None) ->
     return {"ok": True, "path": str(dest), "name": dest.name}
 
 
+def webhook_token_configured() -> bool:
+    return bool((os.environ.get("CONTENT_ENGINE_WEBHOOK_TOKEN") or "").strip())
+
+
+def check_webhook_token(headers: dict[str, str] | None) -> dict[str, Any] | None:
+    """If CONTENT_ENGINE_WEBHOOK_TOKEN is set, require X-Webhook-Token or Bearer.
+
+    Returns None when OK, else an error dict (ok=False).
+    """
+    expected = (os.environ.get("CONTENT_ENGINE_WEBHOOK_TOKEN") or "").strip()
+    if not expected:
+        return None
+    headers = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
+    got = (headers.get("x-webhook-token") or "").strip()
+    if not got:
+        auth = (headers.get("authorization") or "").strip()
+        if auth.lower().startswith("bearer "):
+            got = auth[7:].strip()
+    if got != expected:
+        return {
+            "ok": False,
+            "error": "webhook token required (X-Webhook-Token or Authorization: Bearer)",
+            "honesty": "Set CONTENT_ENGINE_WEBHOOK_TOKEN to require auth; empty = open local only",
+        }
+    return None
+
+
+def receive_inbox_webhook(
+    body: dict[str, Any] | list[Any] | str | None,
+    *,
+    headers: dict[str, str] | None = None,
+    approve: bool | None = None,
+) -> dict[str, Any]:
+    """n8n-compatible local webhook → drop script into inbox (+ optional approve).
+
+    Accepts: raw script {scenes}, {script}, {body}/{json}, or n8n array [{json}].
+    Not a hosted n8n instance — receiver only.
+    """
+    denied = check_webhook_token(headers)
+    if denied:
+        return denied
+
+    raw: Any = body
+    if isinstance(raw, list) and raw:
+        raw = raw[0]
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            return {"ok": False, "error": f"invalid JSON: {exc}"}
+    if not isinstance(raw, dict):
+        return {"ok": False, "error": "JSON object (script) required"}
+
+    name = raw.get("name") if isinstance(raw.get("name"), str) else None
+    do_approve = bool(raw.get("approve")) if approve is None else bool(approve)
+    script: Any = raw.get("script")
+    if script is None and isinstance(raw.get("body"), dict):
+        script = raw["body"]
+    if script is None and isinstance(raw.get("json"), dict):
+        script = raw["json"]
+    if script is None and raw.get("scenes"):
+        script = {k: v for k, v in raw.items() if k not in {"name", "approve", "token"}}
+    if isinstance(script, str):
+        try:
+            script = json.loads(script)
+        except json.JSONDecodeError as exc:
+            return {"ok": False, "error": f"script JSON: {exc}"}
+    if not isinstance(script, dict) or not script.get("scenes"):
+        return {
+            "ok": False,
+            "error": "need script with scenes[] (raw, .script, .body, or .json)",
+            "honesty": "Local n8n-compatible webhook — not Telegram Bot API / not hosted n8n",
+        }
+
+    saved = save_inbox_script(script, name=name)
+    approved = False
+    if do_approve and saved.get("name"):
+        from content_engine.inbox import approve_script
+
+        ap = approve_script(str(saved["name"]))
+        approved = bool(ap.get("ok"))
+        saved["approve"] = ap
+    return {
+        **saved,
+        "approved": approved,
+        "webhook": True,
+        "honesty": (
+            "Local webhook receiver for n8n HTTP Request → inbox. "
+            "Not a full n8n cloud; optional CONTENT_ENGINE_WEBHOOK_TOKEN."
+        ),
+    }
+
+
+def webhook_inbox_help() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "path": "/api/webhook/inbox",
+        "method": "POST",
+        "token_required": webhook_token_configured(),
+        "headers": ["X-Webhook-Token: <token>", "Authorization: Bearer <token>"],
+        "body_examples": [
+            {"title": "hook", "scenes": [{"id": "s1", "dialogue": "hi"}]},
+            {"script": {"title": "x", "scenes": []}, "name": "from_n8n.json", "approve": True},
+        ],
+        "honesty": "Drop-in for n8n HTTP Request node — local Ops Console only, not hosted n8n",
+    }
+
+
 def save_asset(filename: str, raw: bytes, *, kind: str = "media") -> dict[str, Any]:
     safe = Path(filename).name
     if kind == "music":

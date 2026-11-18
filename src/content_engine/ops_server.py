@@ -26,7 +26,10 @@ class OpsHandler(BaseHTTPRequestHandler):
     def _cors(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, X-Webhook-Token, Authorization",
+        )
 
     def _json(self, code: int, payload: dict[str, Any]) -> None:
         raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -110,6 +113,9 @@ class OpsHandler(BaseHTTPRequestHandler):
         if path == "/api/inbox":
             self._json(200, ops_api.list_inbox())
             return
+        if path in {"/api/webhook/inbox", "/api/webhook"}:
+            self._json(200, ops_api.webhook_inbox_help())
+            return
         if path.startswith("/api/job/"):
             jid = path.split("/api/job/", 1)[1].strip("/")
             self._json(200, ops_api.get_job(jid))
@@ -136,6 +142,7 @@ class OpsHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path
+        qs = parse_qs(parsed.query)
         try:
             body = self._read_json()
         except json.JSONDecodeError:
@@ -177,6 +184,24 @@ class OpsHandler(BaseHTTPRequestHandler):
                     200,
                     ops_api.save_inbox_script(script, name=body.get("name")),
                 )
+                return
+            if path in {"/api/webhook/inbox", "/api/webhook"}:
+                hdrs = {k: v for k, v in self.headers.items()}
+                approve = body.get("approve") if isinstance(body, dict) else None
+                if "approve" in qs:
+                    approve = str(qs.get("approve", [""])[0]).lower() in {
+                        "1",
+                        "true",
+                        "yes",
+                        "on",
+                    }
+                result = ops_api.receive_inbox_webhook(
+                    body if body else None,
+                    headers=hdrs,
+                    approve=approve if approve is not None else None,
+                )
+                code = 200 if result.get("ok") else 401 if "token" in str(result.get("error") or "") else 400
+                self._json(code, result)
                 return
             if path == "/api/inbox/process":
                 jid = ops_api.action_process_inbox(

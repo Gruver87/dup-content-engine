@@ -916,11 +916,12 @@ body {
     <section class="panel" id="tab-queue">
       <div class="gap-scan amber">
         <h4 data-i18n="gapQueueTitle">Очередь · сверка Habr / Thrice / content-factory</h4>
-        <p class="sub" data-i18n="gapQueueSub">Есть: inbox, dry-run, fixture, local approve gate. Нет: Telegram Bot API remote, n8n webhook, fake virality.</p>
+        <p class="sub" data-i18n="gapQueueSub">Есть: inbox, dry-run, fixture, local approve, n8n webhook receiver. Нет: Telegram Bot API remote, fake virality.</p>
         <div class="chip-row">
           <span class="chip have" data-i18n="chipHaveInbox">есть inbox</span>
           <span class="chip have" data-i18n="chipHaveDry">есть dry-run</span>
           <span class="chip have" data-i18n="chipHaveTg">есть local approve gate</span>
+          <span class="chip have" data-i18n="chipHaveN8n">есть n8n webhook (local)</span>
           <span class="chip miss" data-i18n="chipMissVirality">нет fake virality</span>
         </div>
       </div>
@@ -928,6 +929,7 @@ body {
         <div class="card">
           <h3 data-i18n="inboxQueue">Inbox queue</h3>
           <p class="sub" data-i18n="inboxHint">Drop script.json — like Opus/MKVID drop-folder.</p>
+          <p class="sub" data-i18n="webhookHint">n8n → POST /api/webhook/inbox (опц. CONTENT_ENGINE_WEBHOOK_TOKEN)</p>
           <div class="drop" id="inboxDrop" data-i18n="dropInbox">Drop script.json here</div>
           <textarea id="inboxPaste" placeholder='{"title":"...","scenes":[...]}' style="margin-top:12px"></textarea>
           <div class="row" style="margin-top:10px">
@@ -1127,7 +1129,9 @@ const I18N = {
     colCreate: "Создать", colAdd: "В выбранную", colEmpty: "Коллекция пуста", colRemove: "Убрать",
     makeThumb: "Thumb",
     gapQueueTitle: "Очередь · сверка Habr / Thrice / content-factory",
-    gapQueueSub: "Есть: inbox, dry-run, fixture, local approve. Нет: Telegram Bot API, n8n webhook, fake virality.",
+    gapQueueSub: "Есть: inbox, dry-run, fixture, local approve, n8n webhook. Нет: Telegram Bot API, fake virality.",
+    chipHaveN8n: "есть n8n webhook (local)",
+    webhookHint: "n8n → POST /api/webhook/inbox (опц. CONTENT_ENGINE_WEBHOOK_TOKEN)",
     chipHaveInbox: "есть inbox", chipHaveDry: "есть dry-run",
     chipHaveTg: "есть local approve gate", chipMissVirality: "нет fake virality",
     requireApprove: "Нужен approve перед process",
@@ -1285,7 +1289,9 @@ const I18N = {
     colCreate: "Create", colAdd: "Add selected", colEmpty: "Collection empty", colRemove: "Remove",
     makeThumb: "Thumb",
     gapQueueTitle: "Queue · Habr / Thrice / content-factory scan",
-    gapQueueSub: "Have: inbox, dry-run, fixture, local approve. Missing: Telegram Bot API, n8n webhook, fake virality.",
+    gapQueueSub: "Have: inbox, dry-run, fixture, local approve, n8n webhook. Missing: Telegram Bot API, fake virality.",
+    chipHaveN8n: "have n8n webhook (local)",
+    webhookHint: "n8n → POST /api/webhook/inbox (opt. CONTENT_ENGINE_WEBHOOK_TOKEN)",
     chipHaveInbox: "have inbox", chipHaveDry: "have dry-run",
     chipHaveTg: "have local approve gate", chipMissVirality: "no fake virality",
     requireApprove: "Require approve before process",

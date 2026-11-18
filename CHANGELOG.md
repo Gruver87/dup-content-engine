@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.35 — 2026-11-18
+
+- Local **n8n-compatible webhook**: `POST /api/webhook/inbox` → inbox (+ optional approve)
+- Optional `CONTENT_ENGINE_WEBHOOK_TOKEN` (`X-Webhook-Token` / Bearer) — not hosted n8n
+
 ## 0.1.34 — 2026-11-18
 
 - Montage **basic keyframes**: per-clip fade in/out + zoom punch-in on stitch
