@@ -20,6 +20,7 @@ from content_engine.montage import (
     apply_clip_compress,
     apply_clip_cartoon,
     apply_clip_cover_blur,
+    apply_clip_cross_process,
     apply_clip_deflicker,
     apply_clip_echo,
     apply_clip_edge_fade,
@@ -32,6 +33,7 @@ from content_engine.montage import (
     apply_clip_grain,
     apply_clip_hue,
     apply_clip_letterbox,
+    apply_clip_limiter,
     apply_clip_loudnorm,
     apply_clip_mono,
     apply_clip_negate,
@@ -39,23 +41,29 @@ from content_engine.montage import (
     apply_clip_pitch,
     apply_clip_pixelate,
     apply_clip_posterize,
+    apply_clip_presence,
     apply_clip_reverb,
     apply_clip_rgbshift,
     apply_clip_softlight,
+    apply_clip_solarize,
     apply_clip_speed_ramp,
     apply_clip_stereo_widen,
     apply_clip_tint,
     apply_clip_trails,
     apply_clip_vibrance,
     apply_clip_watermark,
+    apply_clip_zoom_punch,
     clear_timeline_fx,
     copy_clip_fx,
     duplicate_timeline_clip,
     export_audio_mp3,
     export_contact_sheet,
+    export_silent_video,
     export_waveform_png,
     extract_clip_audio,
     move_timeline_clip,
+    mute_all_clips,
+    probe_fill_durations,
     randomize_timeline_transition,
     rename_timeline_clip,
     reverse_timeline_order,
@@ -368,6 +376,37 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_dense_057_presence_looks_probe(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    lib = tmp_path / "library" / "imports"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    monkeypatch.setattr("content_engine.montage.LIBRARY", out / "library")
+    out.mkdir(parents=True)
+    lib.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_presence(src, out / "pr.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_limiter(src, out / "lm.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_solarize(src, out / "so.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_cross_process(src, out / "xp.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_zoom_punch(src, out / "zp.mp4", strength=0.35, width=320, height=560, fps=12)["ok"]
+
+    rel = "library/imports/src.mp4"
+    dest = out / "library" / "imports" / "src.mp4"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(src.read_bytes())
+    save_timeline([{"name": "a", "rel": rel, "path": str(dest)}, {"name": "b", "rel": rel, "path": str(dest)}])
+    pf = probe_fill_durations()
+    assert pf["ok"] and pf.get("filled", 0) >= 1
+    assert mute_all_clips(mute=True)["ok"]
+    latest = out / "edit_latest.mp4"
+    latest.write_bytes(src.read_bytes())
+    assert export_silent_video()["ok"]
 
 
 def test_dense_056_look_audio_exports(tmp_path, monkeypatch):

@@ -1153,7 +1153,10 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         move_timeline_clip,
         export_audio_mp3,
         export_contact_sheet,
+        export_silent_video,
         export_waveform_png,
+        mute_all_clips,
+        probe_fill_durations,
         randomize_timeline_transition,
         rename_timeline_clip,
         resolve_user_path,
@@ -1237,6 +1240,12 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
             cols=int(body.get("cols") or 3),
             rows=int(body.get("rows") or 3),
         )
+    if action == "probe_durations":
+        return probe_fill_durations()
+    if action == "mute_all":
+        return mute_all_clips(mute=bool(body.get("mute", True)))
+    if action == "silent":
+        return export_silent_video()
     if action == "clear_fx":
         idx = body.get("index")
         return clear_timeline_fx(index=int(idx) if idx is not None else None)

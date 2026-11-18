@@ -2497,6 +2497,11 @@ CLIP_FX_KEYS: tuple[str, ...] = (
     "mono",
     "peak_norm",
     "reverb",
+    "presence",
+    "limiter",
+    "solarize",
+    "cross_process",
+    "zoom_punch",
 )
 
 
@@ -4143,6 +4148,231 @@ def export_contact_sheet(*, cols: int = 3, rows: int = 3) -> dict[str, Any]:
     }
 
 
+def apply_clip_presence(
+    src: Path, out: Path, *, strength: float = 0.4, fps: int = 30
+) -> dict[str, Any]:
+    """Presence/treble shelf. Not CapCut vocal enhancer AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    gain = 1.5 + st * 6
+    ok = _af_encode(src, out, f"equalizer=f=3000:width_type=o:width=1.5:g={gain:.1f}")
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Presence = treble equalizer. Not CapCut vocal AI enhance.",
+    }
+
+
+def apply_clip_limiter(
+    src: Path, out: Path, *, strength: float = 0.5, fps: int = 30
+) -> dict[str, Any]:
+    """Simple alimiter. Not CapCut mastering AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    level = 0.95 - st * 0.25
+    ok = _af_encode(src, out, f"alimiter=level_in=1:level_out={level:.2f}:limit=0.9")
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Limiter = alimiter. Not CapCut mastering / AI loudness.",
+    }
+
+
+def apply_clip_solarize(
+    src: Path, out: Path, *, strength: float = 0.45, fps: int = 30
+) -> dict[str, Any]:
+    """Solarize via negate blend. Not CapCut solarize packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    opac = 0.25 + st * 0.6
+    fc = (
+        f"[0:v]split=2[a][b];[b]negate[n];"
+        f"[a][n]blend=all_mode=average:all_opacity={opac:.3f}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Solarize = negate blend. Not CapCut solarize marketplace.",
+    }
+
+
+def apply_clip_cross_process(
+    src: Path, out: Path, *, strength: float = 0.45, fps: int = 30
+) -> dict[str, Any]:
+    """Cross-process color wash. Not CapCut film stock packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    rs, bs = 0.06 * st, -0.08 * st
+    sat = 1.0 + st * 0.35
+    ok = _vf_encode(
+        src,
+        out,
+        f"colorbalance=rs={rs:.3f}:bs={bs:.3f}:rm={rs * 0.5:.3f},eq=saturation={sat:.3f}",
+        fps=fps,
+    )
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Cross-process = colorbalance+sat. Not CapCut film stock packs.",
+    }
+
+
+def apply_clip_zoom_punch(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.35,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Quick zoom-in punch via zoompan. Not CapCut beat zoom AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    w, h = int(width or 1080), int(height or 1920)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    zmax = 1.0 + st * 0.35
+    dur = float(media_duration_sec(src) or 1.0)
+    frames = max(8, int(dur * fps))
+    # zoom from 1 → zmax over clip
+    zexpr = f"min({zmax:.4f},1+({zmax:.4f}-1)*on/{frames})"
+    vf = (
+        f"scale={w * 2}:{h * 2},"
+        f"zoompan=z='{zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps}"
+    )
+    ok = _vf_encode(src, out, vf, fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Zoom punch = zoompan ramp. Not CapCut beat-zoom AI.",
+    }
+
+
+def probe_fill_durations() -> dict[str, Any]:
+    """Fill missing duration_sec via ffprobe. Not CapCut cloud analyze."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    filled = 0
+    for c in clips:
+        if c.get("duration_sec") is not None:
+            continue
+        src = resolve_user_path(str(c.get("rel") or c.get("path") or ""))
+        if not src or not src.is_file():
+            p = Path(str(c.get("path") or ""))
+            src = p if p.is_file() else None
+        if not src:
+            continue
+        d = media_duration_sec(src)
+        if d and d > 0:
+            c["duration_sec"] = round(float(d), 3)
+            filled += 1
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "filled": filled,
+        "honesty": "Probe durations = ffprobe. Not CapCut cloud analyze AI.",
+    }
+
+
+def mute_all_clips(*, mute: bool = True) -> dict[str, Any]:
+    """Set mute flag on all timeline clips."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    for c in clips:
+        c["mute"] = bool(mute)
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {**saved, "mute": bool(mute), "count": len(clips)}
+
+
+def export_silent_video() -> dict[str, Any]:
+    """Copy latest stitch without audio. Not CapCut detach AI."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    out = MONTAGE_OUT / "edit_silent.mp4"
+    run_ffmpeg(
+        [
+            "-i",
+            str(mp4),
+            "-an",
+            "-c:v",
+            "copy",
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Silent = -an stream copy. Not CapCut detach AI.",
+    }
+
+
 def add_black_gap_clip(*, duration_sec: float = 0.5, width: int = 1080, height: int = 1920) -> dict[str, Any]:
     """Append a black gap clip to the timeline. Not CapCut filler AI."""
     _ensure_dirs()
@@ -5035,6 +5265,58 @@ def render_timeline(
             if rvr.get("ok") and not rvr.get("skipped"):
                 piece = rv
                 keyframe_notes.append(f"{c.get('name') or i}:reverb")
+        try:
+            presence = float(c.get("presence") or 0.0)
+        except (TypeError, ValueError):
+            presence = 0.0
+        if presence >= 0.08:
+            pr = work / f"pr_{i:03d}.mp4"
+            prr = apply_clip_presence(piece, pr, strength=presence, fps=fps)
+            if prr.get("ok") and not prr.get("skipped"):
+                piece = pr
+                keyframe_notes.append(f"{c.get('name') or i}:presence")
+        try:
+            limiter = float(c.get("limiter") or 0.0)
+        except (TypeError, ValueError):
+            limiter = 0.0
+        if limiter >= 0.08:
+            lm = work / f"lm_{i:03d}.mp4"
+            lmr = apply_clip_limiter(piece, lm, strength=limiter, fps=fps)
+            if lmr.get("ok") and not lmr.get("skipped"):
+                piece = lm
+                keyframe_notes.append(f"{c.get('name') or i}:limiter")
+        try:
+            solarize = float(c.get("solarize") or 0.0)
+        except (TypeError, ValueError):
+            solarize = 0.0
+        if solarize >= 0.08:
+            so = work / f"so_{i:03d}.mp4"
+            sor = apply_clip_solarize(piece, so, strength=solarize, fps=fps)
+            if sor.get("ok") and not sor.get("skipped"):
+                piece = so
+                keyframe_notes.append(f"{c.get('name') or i}:solarize")
+        try:
+            xproc = float(c.get("cross_process") or 0.0)
+        except (TypeError, ValueError):
+            xproc = 0.0
+        if xproc >= 0.08:
+            xp = work / f"xp_{i:03d}.mp4"
+            xpr = apply_clip_cross_process(piece, xp, strength=xproc, fps=fps)
+            if xpr.get("ok") and not xpr.get("skipped"):
+                piece = xp
+                keyframe_notes.append(f"{c.get('name') or i}:xproc")
+        try:
+            punch = float(c.get("zoom_punch") or 0.0)
+        except (TypeError, ValueError):
+            punch = 0.0
+        if punch >= 0.08:
+            zp = work / f"zp_{i:03d}.mp4"
+            zpr = apply_clip_zoom_punch(
+                piece, zp, strength=punch, width=width, height=height, fps=fps
+            )
+            if zpr.get("ok") and not zpr.get("skipped"):
+                piece = zp
+                keyframe_notes.append(f"{c.get('name') or i}:zoom_punch")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

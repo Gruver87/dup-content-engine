@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.57 — 2026-11-18
+
+Dense batch (~10):
+- Clip: presence, limiter, solarize, cross-process, zoom punch
+- Timeline: probe durations, mute all · silent mp4 export
+- Check script `scripts/check_batch_057.ps1`
+
 ## 0.1.56 — 2026-11-18
 
 Dense batch (~14):
