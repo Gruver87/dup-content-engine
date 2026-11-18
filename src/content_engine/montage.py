@@ -978,6 +978,64 @@ def apply_clip_mirror(
     }
 
 
+def apply_clip_rotate(
+    src: Path,
+    out: Path,
+    *,
+    degrees: int = 90,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Rotate clip by 90 / 180 / 270 degrees (transpose / rotate).
+
+    Honesty: fixed 90° steps — not CapCut free-angle rotate / 3D.
+    """
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    try:
+        deg = int(degrees) % 360
+    except (TypeError, ValueError):
+        deg = 90
+    if deg not in {90, 180, 270}:
+        return {"ok": False, "error": "rotate must be 90, 180, or 270"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # 90 CW = transpose=1, 270 CW = transpose=2, 180 = rotate=PI
+    vf = {
+        90: "transpose=1",
+        180: "transpose=1,transpose=1",
+        270: "transpose=2",
+    }[deg]
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "rotate": deg,
+        "honesty": "Clip rotate = 90° steps (transpose). Not CapCut free-angle / 3D.",
+    }
+
+
 def apply_clip_freeze(
     src: Path,
     out: Path,
@@ -1356,6 +1414,16 @@ def render_timeline(
                 keyframe_notes.append(
                     f"{c.get('name') or i}:grade=b{brightness:.2f}/c{contrast:.2f}/s{saturation:.2f}"
                 )
+        try:
+            rotate = int(c.get("rotate") or 0) % 360
+        except (TypeError, ValueError):
+            rotate = 0
+        if rotate in {90, 180, 270}:
+            rot = work / f"rot_{i:03d}.mp4"
+            rr = apply_clip_rotate(piece, rot, degrees=rotate, fps=fps)
+            if rr.get("ok"):
+                piece = rot
+                keyframe_notes.append(f"{c.get('name') or i}:rot={rotate}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

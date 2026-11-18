@@ -7,6 +7,7 @@ from content_engine.montage import (
     apply_clip_keyframes,
     apply_clip_mirror,
     apply_clip_overlay_text,
+    apply_clip_rotate,
     apply_clip_speed,
     apply_clip_volume,
     aspect_size,
@@ -154,6 +155,11 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     gg = apply_clip_grade(src, grd, brightness=0.1, contrast=1.1, saturation=1.2, fps=12)
     assert gg["ok"] is True and Path(gg["path"]).is_file()
     assert "eq" in (gg.get("honesty") or "").lower() or "CapCut" in (gg.get("honesty") or "")
+
+    rot = out / "rot.mp4"
+    rt = apply_clip_rotate(src, rot, degrees=90, fps=12)
+    assert rt["ok"] is True and rt.get("rotate") == 90
+    assert Path(rt["path"]).is_file()
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

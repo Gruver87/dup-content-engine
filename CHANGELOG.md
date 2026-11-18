@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.45 — 2026-11-18
+
+- Montage **rotate** 90/180/270 on stitch — not CapCut free-angle / 3D
+- Console Timeline: Rotate select
+
 ## 0.1.44 — 2026-11-18
 
 - Montage **grade**: brightness / contrast / saturation (ffmpeg eq) — not CapCut curves/LUT
