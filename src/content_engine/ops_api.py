@@ -1140,15 +1140,22 @@ def action_montage_smoke(body: dict[str, Any] | None = None) -> dict[str, Any]:
 
 def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any]:
     from content_engine.montage import (
+        add_black_gap_clip,
         add_timeline_marker,
         clear_timeline_fx,
         clear_timeline_markers,
+        copy_clip_fx,
+        duplicate_timeline_clip,
+        export_montage_gif,
         extract_clip_audio,
         list_grade_presets,
         load_timeline,
         move_timeline_clip,
+        randomize_timeline_transition,
         resolve_user_path,
         shuffle_timeline,
+        sort_timeline,
+        strip_clip_audio,
         timeline_stats,
     )
 
@@ -1173,6 +1180,33 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
             from_index=int(body.get("from_index") if body.get("from_index") is not None else body.get("from") or 0),
             to_index=int(body.get("to_index") if body.get("to_index") is not None else body.get("to") or 0),
         )
+    if action == "duplicate":
+        return duplicate_timeline_clip(index=int(body.get("index") or 0))
+    if action == "sort":
+        return sort_timeline(
+            by=str(body.get("by") or "duration"),
+            reverse=bool(body.get("reverse")),
+        )
+    if action == "copy_fx":
+        return copy_clip_fx(
+            from_index=int(body.get("from_index") if body.get("from_index") is not None else 0),
+            to_index=int(body.get("to_index") if body.get("to_index") is not None else 1),
+        )
+    if action == "random_transition":
+        seed = body.get("seed")
+        return randomize_timeline_transition(seed=int(seed) if seed is not None else None)
+    if action == "gap":
+        return add_black_gap_clip(
+            duration_sec=float(body.get("duration_sec") or 0.5),
+            width=int(body.get("width") or 1080),
+            height=int(body.get("height") or 1920),
+        )
+    if action == "gif":
+        return export_montage_gif(
+            at_sec=float(body.get("at_sec") or 0.0),
+            duration_sec=float(body.get("duration_sec") or 2.0),
+            width=int(body.get("width") or 360),
+        )
     if action == "clear_fx":
         idx = body.get("index")
         return clear_timeline_fx(index=int(idx) if idx is not None else None)
@@ -1193,6 +1227,26 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         if not src or not src.is_file():
             return {"ok": False, "error": "need clip rel/path or timeline index"}
         return extract_clip_audio(src)
+    if action == "strip_audio":
+        tl = load_timeline()
+        clips = tl.get("clips") or []
+        idx = body.get("index")
+        try:
+            i = int(idx) if idx is not None else 0
+        except (TypeError, ValueError):
+            i = 0
+        if not (0 <= i < len(clips)):
+            return {"ok": False, "error": "bad index"}
+        cand = str(clips[i].get("rel") or clips[i].get("path") or "")
+        src = resolve_user_path(cand)
+        if not src or not src.is_file():
+            return {"ok": False, "error": "missing clip file"}
+        import uuid as _uuid
+
+        from content_engine.montage import MONTAGE_OUT
+
+        dest = MONTAGE_OUT / f"mute_{_uuid.uuid4().hex[:8]}.mp4"
+        return strip_clip_audio(src, dest)
     tl = load_timeline()
     return {
         "ok": True,

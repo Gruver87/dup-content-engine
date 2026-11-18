@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.54 — 2026-11-18
+
+Dense batch (~15):
+- xfade pack: diagbl/br, zoomin/out, fadefast/slow, wipe corners
+- Clip: pixelate, negate, edges, cover blur, echo, hue, boxblur, compress, watermark
+- Timeline: duplicate/sort/copy FX/random xfade/+gap/GIF/strip audio
+- Check script `scripts/check_batch_054.ps1`
+
 ## 0.1.53 — 2026-11-18
 
 Batch (one ship):

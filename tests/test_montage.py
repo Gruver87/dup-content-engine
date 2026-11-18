@@ -11,20 +11,34 @@ from content_engine.montage import (
     apply_clip_look,
     apply_clip_loop,
     apply_clip_burn_srt,
+    add_black_gap_clip,
     apply_clip_audio_filter,
+    apply_clip_boxblur,
+    apply_clip_compress,
+    apply_clip_cover_blur,
+    apply_clip_echo,
     apply_clip_edge_fade,
+    apply_clip_edges,
     apply_clip_flash,
     apply_clip_glow,
     apply_clip_grain,
+    apply_clip_hue,
     apply_clip_letterbox,
     apply_clip_loudnorm,
+    apply_clip_negate,
+    apply_clip_pixelate,
     apply_clip_posterize,
     apply_clip_rgbshift,
     apply_clip_speed_ramp,
     apply_clip_tint,
+    apply_clip_watermark,
     clear_timeline_fx,
+    copy_clip_fx,
+    duplicate_timeline_clip,
     extract_clip_audio,
     move_timeline_clip,
+    randomize_timeline_transition,
+    sort_timeline,
     apply_clip_mirror,
     apply_clip_opacity,
     apply_clip_overlay_text,
@@ -332,6 +346,56 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_dense_054_fx_and_timeline_ops(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    lib = tmp_path / "library"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    monkeypatch.setattr("content_engine.montage.LIBRARY", lib)
+    out.mkdir(parents=True)
+    (lib / "imports").mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_pixelate(src, out / "px.mp4", block=8, width=320, height=560, fps=12)["ok"]
+    assert apply_clip_negate(src, out / "ng.mp4", fps=12)["ok"]
+    assert apply_clip_edges(src, out / "ed.mp4", strength=0.5, fps=12)["ok"]
+    assert apply_clip_cover_blur(src, out / "cb.mp4", strength=0.5, width=320, height=560, fps=12)["ok"]
+    assert apply_clip_echo(src, out / "ec.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_hue(src, out / "hue.mp4", degrees=40, fps=12)["ok"]
+    assert apply_clip_boxblur(src, out / "bb.mp4", radius=3, fps=12)["ok"]
+    assert apply_clip_compress(src, out / "cp.mp4", strength=0.5, fps=12)["ok"]
+    assert apply_clip_watermark(src, out / "wm.mp4", text="DUP", fps=12)["ok"]
+
+    pack = list_transitions()
+    for key in ("zoomin", "fadefast", "wipeul", "diagbr"):
+        assert key in pack["transitions"]
+
+    save_timeline(
+        [
+            {"name": "a", "duration_sec": 3, "flash": 0.4},
+            {"name": "b", "duration_sec": 1},
+            {"name": "c", "duration_sec": 2},
+        ]
+    )
+    assert duplicate_timeline_clip(index=0)["ok"]
+    st = sort_timeline(by="duration")
+    assert st["ok"] and st["timeline"]["clips"][0]["duration_sec"] == 1
+    save_timeline(
+        [
+            {"name": "a", "duration_sec": 3, "flash": 0.4},
+            {"name": "b", "duration_sec": 1},
+        ]
+    )
+    cf = copy_clip_fx(from_index=0, to_index=1)
+    assert cf["ok"] and cf["timeline"]["clips"][1].get("flash") == 0.4
+    rt = randomize_timeline_transition(seed=1)
+    assert rt["ok"] and rt.get("transition") in pack["transitions"]
+    gap = add_black_gap_clip(duration_sec=0.4, width=320, height=560)
+    assert gap["ok"] and gap.get("clip")
 
 
 def test_ramp_tint_audio_move_xfade(tmp_path, monkeypatch):

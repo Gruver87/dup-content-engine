@@ -57,6 +57,16 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
     "circlecrop": {"label": "Circle crop", "label_ru": "Круг crop", "xfade": "circlecrop", "note": "circle wipe"},
     "squeezeh": {"label": "Squeeze H", "label_ru": "Сжатие H", "xfade": "squeezeh", "note": "horizontal squeeze"},
     "squeezev": {"label": "Squeeze V", "label_ru": "Сжатие V", "xfade": "squeezev", "note": "vertical squeeze"},
+    "diagbl": {"label": "Diag ↙", "label_ru": "Диаг ↙", "xfade": "diagbl", "note": "diagonal"},
+    "diagbr": {"label": "Diag ↘", "label_ru": "Диаг ↘", "xfade": "diagbr", "note": "diagonal"},
+    "zoomin": {"label": "Zoom in", "label_ru": "Зум +", "xfade": "zoomin", "note": "zoom in"},
+    "zoomout": {"label": "Zoom out", "label_ru": "Зум −", "xfade": "zoomout", "note": "zoom out"},
+    "fadefast": {"label": "Fade fast", "label_ru": "Fade быстро", "xfade": "fadefast", "note": "fast fade"},
+    "fadeslow": {"label": "Fade slow", "label_ru": "Fade медленно", "xfade": "fadeslow", "note": "slow fade"},
+    "wipeul": {"label": "Wipe ↖", "label_ru": "Шторка ↖", "xfade": "wipeul", "note": "wipe UL"},
+    "wipeur": {"label": "Wipe ↗", "label_ru": "Шторка ↗", "xfade": "wipeur", "note": "wipe UR"},
+    "wipedl": {"label": "Wipe ↙", "label_ru": "Шторка ↙", "xfade": "wipedl", "note": "wipe DL"},
+    "wipedr": {"label": "Wipe ↘", "label_ru": "Шторка ↘", "xfade": "wipedr", "note": "wipe DR"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -2433,6 +2443,15 @@ CLIP_FX_KEYS: tuple[str, ...] = (
     "highpass_hz",
     "lowpass_hz",
     "pan",
+    "pixelate",
+    "negate",
+    "edges",
+    "cover_blur",
+    "echo",
+    "hue_deg",
+    "boxblur",
+    "compress",
+    "watermark",
 )
 
 
@@ -2957,6 +2976,541 @@ def move_timeline_clip(*, from_index: int, to_index: int) -> dict[str, Any]:
         "from_index": fi,
         "to_index": ti,
         "honesty": "Move clip = list reorder. Not CapCut magnetic / auto rearrange.",
+    }
+
+
+def duplicate_timeline_clip(*, index: int) -> dict[str, Any]:
+    """Duplicate one timeline clip entry (JSON only)."""
+    import copy
+
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    try:
+        i = int(index)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index", "timeline": tl}
+    if i < 0 or i >= len(clips):
+        return {"ok": False, "error": "index out of range", "timeline": tl}
+    clips.insert(i + 1, copy.deepcopy(clips[i]))
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {**saved, "duplicated": i, "honesty": "Duplicate = deepcopy timeline row. Not CapCut compound clip."}
+
+
+def sort_timeline(*, by: str = "duration", reverse: bool = False) -> dict[str, Any]:
+    """Sort clips by duration_sec or name. Not CapCut auto-arrange."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    key = (by or "duration").strip().lower()
+    if key in {"duration", "duration_sec", "dur"}:
+
+        def _k(c: dict[str, Any]) -> float:
+            try:
+                return float(c.get("duration_sec") or 0.0)
+            except (TypeError, ValueError):
+                return 0.0
+
+    else:
+
+        def _k(c: dict[str, Any]) -> str:  # type: ignore[misc]
+            return str(c.get("name") or c.get("rel") or "").lower()
+
+    clips.sort(key=_k, reverse=bool(reverse))
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "sorted_by": key,
+        "reverse": bool(reverse),
+        "honesty": "Sort = local list sort. Not CapCut auto-arrange AI.",
+    }
+
+
+def copy_clip_fx(*, from_index: int, to_index: int) -> dict[str, Any]:
+    """Copy FX keys from one clip onto another. Not CapCut style paste AI."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    try:
+        fi, ti = int(from_index), int(to_index)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index", "timeline": tl}
+    if fi < 0 or fi >= len(clips) or ti < 0 or ti >= len(clips):
+        return {"ok": False, "error": "index out of range", "timeline": tl}
+    src, dst = clips[fi], dict(clips[ti])
+    for k in CLIP_FX_KEYS:
+        if k in src:
+            dst[k] = src[k]
+        else:
+            dst.pop(k, None)
+    clips[ti] = dst
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "from_index": fi,
+        "to_index": ti,
+        "honesty": "Copy FX = JSON field copy. Not CapCut match-style AI.",
+    }
+
+
+def randomize_timeline_transition(*, seed: int | None = None) -> dict[str, Any]:
+    """Pick a random non-cut xfade for the timeline. Not CapCut auto beat."""
+    import random
+
+    keys = [k for k, v in TRANSITIONS.items() if v.get("xfade")]
+    rng = random.Random(seed)
+    pick = rng.choice(keys) if keys else "fade"
+    tl = load_timeline()
+    saved = save_timeline(
+        list(tl.get("clips") or []),
+        transition=pick,
+        transition_sec=float(tl.get("transition_sec") or 0.35),
+        markers=list(tl.get("markers") or []),
+    )
+    return {
+        **saved,
+        "transition": pick,
+        "honesty": "Random transition = uniform pick among xfade keys. Not CapCut beat match.",
+    }
+
+
+def _vf_encode(src: Path, out: Path, vf: str, *, fps: int = 30) -> bool:
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return out.is_file()
+
+
+def apply_clip_pixelate(
+    src: Path,
+    out: Path,
+    *,
+    block: int = 12,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Pixelate via neighbor scale. Not CapCut mosaic packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    b = max(2, min(48, int(block or 12)))
+    w, h = int(width or 1080), int(height or 1920)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if b <= 2:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "block": 0}
+    sw, sh = max(8, w // b), max(8, h // b)
+    vf = f"scale={sw}:{sh}:flags=neighbor,scale={w}:{h}:flags=neighbor"
+    ok = _vf_encode(src, out, vf, fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "block": b,
+        "honesty": "Pixelate = neighbor scale. Not CapCut mosaic marketplace.",
+    }
+
+
+def apply_clip_negate(src: Path, out: Path, *, fps: int = 30) -> dict[str, Any]:
+    """Color negate / invert. Not CapCut invert packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    ok = _vf_encode(src, out, "negate", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Negate = ffmpeg negate. Not CapCut invert FX packs.",
+    }
+
+
+def apply_clip_edges(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.5,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Edge detect overlay look. Not CapCut sketch AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    # blend edgedetect with source
+    opac = 0.25 + st * 0.7
+    fc = (
+        f"[0:v]split=2[base][e];[e]edgedetect=low=0.1:high=0.3[ed];"
+        f"[base][ed]blend=all_mode=screen:all_opacity={opac:.3f}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Edges = edgedetect+blend. Not CapCut sketch / AI outline.",
+    }
+
+
+def apply_clip_cover_blur(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.55,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Blurred full-frame cover behind centered subject. Not CapCut auto reframe."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    w, h = int(width or 1080), int(height or 1920)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    sigma = 8 + st * 24
+    fc = (
+        f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
+        f"gblur=sigma={sigma:.1f}[bg];"
+        f"[0:v]scale={w}:{h}:force_original_aspect_ratio=decrease[fg];"
+        f"[bg][fg]overlay=(W-w)/2:(H-h)/2[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Cover blur = blurred fill + centered overlay. Not CapCut auto-reframe AI.",
+    }
+
+
+def apply_clip_echo(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Simple aecho. Not CapCut reverb packs / AI space."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    in_gain = 0.6
+    out_gain = 0.35 + st * 0.45
+    delays = int(120 + st * 280)
+    decays = 0.25 + st * 0.4
+    af = f"aecho={in_gain}:{out_gain}:{delays}:{decays:.2f}"
+    run_ffmpeg(
+        ["-i", str(src), "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "128k", str(out)]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Echo = ffmpeg aecho. Not CapCut reverb marketplace.",
+    }
+
+
+def strip_clip_audio(src: Path, out: Path, *, fps: int = 30) -> dict[str, Any]:
+    """Mute by dropping audio stream. Not CapCut detach AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg(
+        [
+            "-i",
+            str(src),
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-pix_fmt",
+            "yuv420p",
+            "-r",
+            str(fps),
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Strip audio = -an re-encode. Not CapCut detach / stem tools.",
+    }
+
+
+def apply_clip_hue(
+    src: Path,
+    out: Path,
+    *,
+    degrees: float = 0.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Hue rotate in degrees. Not CapCut HSL curves."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    deg = float(degrees or 0.0) % 360.0
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if abs(deg) < 1.0 or abs(deg - 360) < 1.0:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "degrees": 0.0}
+    ok = _vf_encode(src, out, f"hue=h={deg:.1f}", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "degrees": deg,
+        "honesty": "Hue = ffmpeg hue. Not CapCut HSL / AI recolor.",
+    }
+
+
+def apply_clip_boxblur(
+    src: Path,
+    out: Path,
+    *,
+    radius: int = 4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Box blur. Not CapCut lens blur AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    r = max(0, min(32, int(radius or 0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if r < 1:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    ok = _vf_encode(src, out, f"boxblur=luma_radius={r}:luma_power=1", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "radius": r,
+        "honesty": "Boxblur = ffmpeg boxblur. Not CapCut lens blur / AI bokeh.",
+    }
+
+
+def apply_clip_compress(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.5,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Simple acompressor. Not CapCut multiband / AI loudness."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    ratio = 2 + st * 6
+    threshold = 0.08 - st * 0.05
+    af = f"acompressor=threshold={threshold:.3f}:ratio={ratio:.1f}:attack=20:release=250"
+    run_ffmpeg(
+        ["-i", str(src), "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "128k", str(out)]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Compress = ffmpeg acompressor. Not CapCut multiband / AI loudness.",
+    }
+
+
+def apply_clip_watermark(
+    src: Path,
+    out: Path,
+    *,
+    text: str = "DUP",
+    corner: str = "br",
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Corner text watermark. Not CapCut brand kit cloud."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    label = (text or "").strip()[:48]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not label:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    corner = (corner or "br").lower()
+    pos = {
+        "br": "x=w-tw-24:y=h-th-24",
+        "bl": "x=24:y=h-th-24",
+        "tr": "x=w-tw-24:y=24",
+        "tl": "x=24:y=24",
+    }.get(corner, "x=w-tw-24:y=h-th-24")
+    safe = label.replace("\\", "\\\\").replace(":", "\\:").replace("'", "")
+    vf = f"drawtext=text='{safe}':fontsize=28:fontcolor=white@0.7:borderw=1:{pos}"
+    ok = _vf_encode(src, out, vf, fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "text": label,
+        "corner": corner,
+        "honesty": "Watermark = drawtext corner. Not CapCut brand kit / cloud logos.",
+    }
+
+
+def export_montage_gif(*, at_sec: float = 0.0, duration_sec: float = 2.0, width: int = 360) -> dict[str, Any]:
+    """Short GIF preview from latest stitch. Not CapCut auto GIF AI."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    out = MONTAGE_OUT / "edit_preview.gif"
+    t0 = max(0.0, float(at_sec or 0.0))
+    dur = max(0.5, min(5.0, float(duration_sec or 2.0)))
+    w = max(160, min(640, int(width or 360)))
+    run_ffmpeg(
+        [
+            "-ss",
+            f"{t0:.3f}",
+            "-t",
+            f"{dur:.3f}",
+            "-i",
+            str(mp4),
+            "-vf",
+            f"fps=10,scale={w}:-1:flags=lanczos",
+            "-loop",
+            "0",
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "GIF preview = short local encode. Not CapCut auto GIF / cloud.",
+    }
+
+
+def add_black_gap_clip(*, duration_sec: float = 0.5, width: int = 1080, height: int = 1920) -> dict[str, Any]:
+    """Append a black gap clip to the timeline. Not CapCut filler AI."""
+    _ensure_dirs()
+    dur = max(0.2, min(5.0, float(duration_sec or 0.5)))
+    out = LIBRARY / "imports" / f"gap_{uuid.uuid4().hex[:8]}.mp4"
+    run_ffmpeg(
+        [
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=black:s={int(width)}x{int(height)}:d={dur:.3f}",
+            "-f",
+            "lavfi",
+            "-i",
+            f"anullsrc=r=44100:cl=stereo",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(out),
+        ]
+    )
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    clip = {
+        "name": f"gap_{dur:.1f}s",
+        "path": str(out),
+        "rel": _rel(out),
+        "duration_sec": dur,
+        "start_sec": 0,
+    }
+    clips.append(clip)
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "clip": clip,
+        "honesty": "Black gap = generated color clip. Not CapCut smart filler.",
     }
 
 
@@ -3561,6 +4115,93 @@ def render_timeline(
             if aqr.get("ok") and not aqr.get("skipped"):
                 piece = aq
                 keyframe_notes.append(f"{c.get('name') or i}:afilter")
+        try:
+            pixelate = int(c.get("pixelate") or 0)
+        except (TypeError, ValueError):
+            pixelate = 0
+        if pixelate >= 3:
+            px = work / f"px_{i:03d}.mp4"
+            pxr = apply_clip_pixelate(
+                piece, px, block=pixelate, width=width, height=height, fps=fps
+            )
+            if pxr.get("ok") and not pxr.get("skipped"):
+                piece = px
+                keyframe_notes.append(f"{c.get('name') or i}:pixelate={pixelate}")
+        if bool(c.get("negate")):
+            ng = work / f"ng_{i:03d}.mp4"
+            ngr = apply_clip_negate(piece, ng, fps=fps)
+            if ngr.get("ok"):
+                piece = ng
+                keyframe_notes.append(f"{c.get('name') or i}:negate")
+        try:
+            edges = float(c.get("edges") or 0.0)
+        except (TypeError, ValueError):
+            edges = 0.0
+        if edges >= 0.08:
+            ed = work / f"ed_{i:03d}.mp4"
+            edr = apply_clip_edges(piece, ed, strength=edges, fps=fps)
+            if edr.get("ok") and not edr.get("skipped"):
+                piece = ed
+                keyframe_notes.append(f"{c.get('name') or i}:edges={edges:.2f}")
+        try:
+            cover_blur = float(c.get("cover_blur") or 0.0)
+        except (TypeError, ValueError):
+            cover_blur = 0.0
+        if cover_blur >= 0.08:
+            cb = work / f"cb_{i:03d}.mp4"
+            cbr = apply_clip_cover_blur(
+                piece, cb, strength=cover_blur, width=width, height=height, fps=fps
+            )
+            if cbr.get("ok") and not cbr.get("skipped"):
+                piece = cb
+                keyframe_notes.append(f"{c.get('name') or i}:cover_blur")
+        try:
+            echo = float(c.get("echo") or 0.0)
+        except (TypeError, ValueError):
+            echo = 0.0
+        if echo >= 0.08:
+            ec = work / f"ec_{i:03d}.mp4"
+            ecr = apply_clip_echo(piece, ec, strength=echo, fps=fps)
+            if ecr.get("ok") and not ecr.get("skipped"):
+                piece = ec
+                keyframe_notes.append(f"{c.get('name') or i}:echo={echo:.2f}")
+        try:
+            hue_deg = float(c.get("hue_deg") or 0.0)
+        except (TypeError, ValueError):
+            hue_deg = 0.0
+        if abs(hue_deg) >= 1.0:
+            hu = work / f"hue_{i:03d}.mp4"
+            hur = apply_clip_hue(piece, hu, degrees=hue_deg, fps=fps)
+            if hur.get("ok") and not hur.get("skipped"):
+                piece = hu
+                keyframe_notes.append(f"{c.get('name') or i}:hue={hue_deg:.0f}")
+        try:
+            boxblur = int(c.get("boxblur") or 0)
+        except (TypeError, ValueError):
+            boxblur = 0
+        if boxblur >= 1:
+            bb = work / f"bb_{i:03d}.mp4"
+            bbr = apply_clip_boxblur(piece, bb, radius=boxblur, fps=fps)
+            if bbr.get("ok") and not bbr.get("skipped"):
+                piece = bb
+                keyframe_notes.append(f"{c.get('name') or i}:boxblur={boxblur}")
+        try:
+            compress = float(c.get("compress") or 0.0)
+        except (TypeError, ValueError):
+            compress = 0.0
+        if compress >= 0.08:
+            cp = work / f"cp_{i:03d}.mp4"
+            cpr = apply_clip_compress(piece, cp, strength=compress, fps=fps)
+            if cpr.get("ok") and not cpr.get("skipped"):
+                piece = cp
+                keyframe_notes.append(f"{c.get('name') or i}:compress")
+        wm = str(c.get("watermark") or "").strip()
+        if wm:
+            wt = work / f"wm_{i:03d}.mp4"
+            wmr = apply_clip_watermark(piece, wt, text=wm, corner=str(c.get("wm_corner") or "br"), fps=fps)
+            if wmr.get("ok") and not wmr.get("skipped"):
+                piece = wt
+                keyframe_notes.append(f"{c.get('name') or i}:wm")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
