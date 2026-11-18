@@ -946,12 +946,32 @@ body {
                 <option value="tl">TL</option>
               </select>
             </label>
+            <label class="field"><span data-i18n="clipGrain">Grain</span>
+              <input id="clipGrain" type="number" min="0" max="40" step="1" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipLetterbox">Letterbox %</span>
+              <input id="clipLetterbox" type="number" min="0" max="28" step="1" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipGlow">Glow</span>
+              <input id="clipGlow" type="number" min="0" max="0.85" step="0.05" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field" style="flex:1"><span data-i18n="clipSrt">SRT rel</span>
+              <input id="clipSrt" type="text" placeholder="assets/…srt" style="min-width:140px"/>
+            </label>
             <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
           </div>
           <div class="row" style="margin-top:10px">
             <label class="check"><input type="checkbox" id="montageBed"/> <span data-i18n="montageBed">Music bed on stitch</span></label>
             <label class="field"><span data-i18n="montageBedVol">Bed vol</span>
               <input id="montageBedVol" type="number" min="0.02" max="0.5" step="0.02" value="0.12" style="min-width:70px"/>
+            </label>
+            <label class="check"><input type="checkbox" id="montageBedDuck"/> <span data-i18n="montageBedDuck">Duck bed</span></label>
+            <label class="field"><span data-i18n="montageExport">Export</span>
+              <select id="montageExport" style="min-width:90px">
+                <option value="draft">Draft</option>
+                <option value="social" selected>Social</option>
+                <option value="hq">HQ</option>
+              </select>
             </label>
           </div>
           <div class="row" style="margin-top:10px">
@@ -1238,7 +1258,7 @@ const I18N = {
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", montageBedDuck: "Duck bed", montageExport: "Export", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1400,7 +1420,7 @@ const I18N = {
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", montageBedDuck: "Duck bed", montageExport: "Export", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2355,6 +2375,10 @@ function renderTimeline() {
     if ($("clipLoudnorm")) $("clipLoudnorm").checked = !!c.loudnorm;
     if ($("clipPip")) $("clipPip").value = c.pip_rel || "";
     if ($("clipPipCorner")) $("clipPipCorner").value = c.pip_corner || "br";
+    if ($("clipGrain")) $("clipGrain").value = c.grain || 0;
+    if ($("clipLetterbox")) $("clipLetterbox").value = c.letterbox || 0;
+    if ($("clipGlow")) $("clipGlow").value = c.glow || 0;
+    if ($("clipSrt")) $("clipSrt").value = c.srt_rel || "";
   }
 }
 $("btnApplyKf")?.addEventListener("click", () => {
@@ -2394,6 +2418,10 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.loudnorm = !!$("clipLoudnorm")?.checked;
   c.pip_rel = ($("clipPip")?.value || "").trim();
   c.pip_corner = $("clipPipCorner")?.value || "br";
+  c.grain = Math.max(0, Math.min(40, parseFloat($("clipGrain")?.value || "0") || 0));
+  c.letterbox = Math.max(0, Math.min(28, parseFloat($("clipLetterbox")?.value || "0") || 0));
+  c.glow = Math.max(0, Math.min(0.85, parseFloat($("clipGlow")?.value || "0") || 0));
+  c.srt_rel = ($("clipSrt")?.value || "").trim();
   TIMELINE[TL_INDEX] = c;
   renderTimeline();
   setDirty(true);
@@ -2441,6 +2469,10 @@ async function loadMedia() {
     if ($("montageBed")) $("montageBed").checked = !!tlFull.montage_prefs.music_bed;
     if ($("montageBedVol") && tlFull.montage_prefs.music_volume != null) {
       $("montageBedVol").value = tlFull.montage_prefs.music_volume;
+    }
+    if ($("montageBedDuck")) $("montageBedDuck").checked = !!tlFull.montage_prefs.bed_duck;
+    if ($("montageExport") && tlFull.montage_prefs.export_preset) {
+      $("montageExport").value = tlFull.montage_prefs.export_preset;
     }
   }
   renderTransGrid();
@@ -2854,10 +2886,12 @@ $("btnRenderTl").onclick = async () => {
   const [width, height] = aspectDims(aspect);
   const music_bed = !!$("montageBed")?.checked;
   const music_volume = Math.max(0.02, Math.min(0.5, parseFloat($("montageBedVol")?.value || "0.12") || 0.12));
+  const bed_duck = !!$("montageBedDuck")?.checked;
+  const export_preset = $("montageExport")?.value || "social";
   try {
     await api("/api/montage/prefs", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ aspect, music_bed, music_volume }),
+      body: JSON.stringify({ aspect, music_bed, music_volume, bed_duck, export_preset }),
     });
   } catch (_) {}
   const r = await api("/api/timeline/render", {

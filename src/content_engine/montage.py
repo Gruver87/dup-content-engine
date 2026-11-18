@@ -48,6 +48,13 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
 
+# Stitch/export encode presets — local CRF/bitrate, not CapCut cloud export
+EXPORT_PRESETS: dict[str, dict[str, Any]] = {
+    "draft": {"label": "Draft", "label_ru": "Черновик", "crf": 28, "preset": "veryfast", "audio_k": 96},
+    "social": {"label": "Social", "label_ru": "Соцсети", "crf": 23, "preset": "veryfast", "audio_k": 128},
+    "hq": {"label": "HQ", "label_ru": "HQ", "crf": 18, "preset": "medium", "audio_k": 192},
+}
+
 # Output canvas presets — crop/scale only, not CapCut auto-reframe AI
 ASPECTS: dict[str, dict[str, Any]] = {
     "9:16": {"label": "9:16", "label_ru": "Вертикаль", "width": 1080, "height": 1920},
@@ -108,6 +115,23 @@ def resolve_transition(name: str | None) -> str:
     return key if key in TRANSITIONS else "cut"
 
 
+def list_export_presets() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "presets": {
+            k: {"label": v["label"], "label_ru": v["label_ru"], "crf": v["crf"]}
+            for k, v in EXPORT_PRESETS.items()
+        },
+        "default": "social",
+        "honesty": "Export preset = local ffmpeg CRF/bitrate. Not CapCut cloud / Space export.",
+    }
+
+
+def resolve_export_preset(name: str | None) -> str:
+    key = (name or "social").strip().lower()
+    return key if key in EXPORT_PRESETS else "social"
+
+
 def load_montage_prefs() -> dict[str, Any]:
     base: dict[str, Any] = {
         "transition": "cut",
@@ -116,6 +140,9 @@ def load_montage_prefs() -> dict[str, Any]:
         "music_bed": False,
         "music_volume": 0.12,
         "music_mood": "warm",
+        "export_preset": "social",
+        "bed_duck": False,
+        "bed_duck_db": -10.0,
     }
     if PREFS_PATH.is_file():
         try:
@@ -133,11 +160,19 @@ def load_montage_prefs() -> dict[str, Any]:
                     base["music_volume"] = float(data["music_volume"])
                 if data.get("music_mood"):
                     base["music_mood"] = str(data["music_mood"])
+                if data.get("export_preset"):
+                    base["export_preset"] = resolve_export_preset(str(data["export_preset"]))
+                if "bed_duck" in data:
+                    base["bed_duck"] = bool(data["bed_duck"])
+                if "bed_duck_db" in data:
+                    base["bed_duck_db"] = float(data["bed_duck_db"])
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     base["transition_sec"] = max(0.15, min(1.2, float(base["transition_sec"])))
     base["aspect"] = resolve_aspect(str(base.get("aspect") or "9:16"))
     base["music_volume"] = max(0.02, min(0.5, float(base.get("music_volume") or 0.12)))
+    base["export_preset"] = resolve_export_preset(str(base.get("export_preset") or "social"))
+    base["bed_duck_db"] = max(-24.0, min(-3.0, float(base.get("bed_duck_db") or -10.0)))
     w, h = aspect_size(base["aspect"])
     base["width"] = w
     base["height"] = h
@@ -164,9 +199,28 @@ def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
             pass
     if patch.get("music_mood"):
         cur["music_mood"] = str(patch["music_mood"]).strip() or "warm"
+    if patch.get("export_preset"):
+        cur["export_preset"] = resolve_export_preset(str(patch["export_preset"]))
+    if "bed_duck" in patch:
+        cur["bed_duck"] = bool(patch["bed_duck"])
+    if "bed_duck_db" in patch:
+        try:
+            cur["bed_duck_db"] = max(-24.0, min(-3.0, float(patch["bed_duck_db"])))
+        except (TypeError, ValueError):
+            pass
     store = {
         k: cur[k]
-        for k in ("transition", "transition_sec", "aspect", "music_bed", "music_volume", "music_mood")
+        for k in (
+            "transition",
+            "transition_sec",
+            "aspect",
+            "music_bed",
+            "music_volume",
+            "music_mood",
+            "export_preset",
+            "bed_duck",
+            "bed_duck_db",
+        )
         if k in cur
     }
     MONTAGE_OUT.mkdir(parents=True, exist_ok=True)
@@ -1225,15 +1279,20 @@ def mix_montage_bed(
     *,
     volume: float = 0.12,
     mood: str = "warm",
+    duck: bool = False,
+    duck_db: float = -10.0,
 ) -> dict[str, Any]:
     """Mix soft music bed under stitched edit audio.
 
     Honesty: procedural/assets bed — not CapCut stock library license claim.
+    Optional sidechain duck = ffmpeg sidechaincompress, not CapCut AI duck.
     """
     if not src.is_file():
         return {"ok": False, "error": f"missing: {src}"}
     out.parent.mkdir(parents=True, exist_ok=True)
     vol = max(0.02, min(0.5, float(volume or 0.12)))
+    do_duck = bool(duck)
+    ddb = max(-24.0, min(-3.0, float(duck_db or -10.0)))
     dur = float(media_duration_sec(src) or 1.0)
     bed = out.with_suffix(".bed.mp3")
     from content_engine.audio_bed import generate_soft_bed, resolve_music_file
@@ -1271,10 +1330,21 @@ def mix_montage_bed(
         (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
     )
     if has_audio:
-        fc = (
-            f"[1:a]volume={vol:.3f}[bed];"
-            f"[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0[a]"
-        )
+        if do_duck:
+            # lower bed further + sidechain from dialogue
+            duck_lin = 10 ** (ddb / 20.0)
+            bed_vol = max(0.01, vol * duck_lin * 2.5)
+            fc = (
+                f"[0:a]asplit=2[voice][sc];"
+                f"[1:a]volume={bed_vol:.4f}[bed];"
+                f"[bed][sc]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=280:makeup=1[ducked];"
+                f"[voice][ducked]amix=inputs=2:duration=first:dropout_transition=0[a]"
+            )
+        else:
+            fc = (
+                f"[1:a]volume={vol:.3f}[bed];"
+                f"[0:a][bed]amix=inputs=2:duration=first:dropout_transition=0[a]"
+            )
         args = [
             "-i",
             str(src),
@@ -1324,9 +1394,11 @@ def mix_montage_bed(
         "rel": _rel(out),
         "bed": note,
         "volume": vol,
+        "duck": do_duck,
+        "duck_db": ddb if do_duck else None,
         "honesty": (
             "Montage music bed = procedural/assets mix under edit. "
-            "Not CapCut commercial stock library."
+            "Duck = ffmpeg sidechaincompress. Not CapCut stock / AI duck."
         ),
     }
 
@@ -2047,6 +2119,255 @@ def apply_clip_pip(
     }
 
 
+def apply_clip_grain(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 8.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Temporal film grain (ffmpeg noise). Not CapCut film stock packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(40.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 1.0:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "strength": 0.0}
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        f"noise=alls={st:.1f}:allf=t+u",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Grain = ffmpeg noise. Not CapCut film stock / AI grain packs.",
+    }
+
+
+def apply_clip_letterbox(
+    src: Path,
+    out: Path,
+    *,
+    bar_pct: float = 12.0,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Black cinematic bars (top+bottom). Not CapCut auto cinematic crop AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    pct = max(0.0, min(28.0, float(bar_pct or 0.0)))
+    w = int(width or 1080)
+    h = int(height or 1920)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if pct < 1.0:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "bar_pct": 0.0}
+    bar = max(2, int(h * (pct / 100.0) / 2.0) * 2)
+    inner = max(16, h - 2 * bar)
+    vf = (
+        f"scale={w}:{inner}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{inner},pad={w}:{h}:0:{bar}:black"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "bar_pct": pct,
+        "honesty": "Letterbox = fixed black bars. Not CapCut auto cinematic / AI reframing.",
+    }
+
+
+def apply_clip_glow(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.35,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Soft bloom via blurred overlay blend. Not CapCut glow packs / AI light."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(0.85, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.05:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "strength": 0.0}
+    sigma = 2.0 + st * 10.0
+    opac = 0.15 + st * 0.55
+    fc = (
+        f"[0:v]split=2[base][b];[b]gblur=sigma={sigma:.2f}[blur];"
+        f"[base][blur]blend=all_mode=screen:all_opacity={opac:.3f}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Glow = blur+screen blend. Not CapCut glow marketplace / AI lighting.",
+    }
+
+
+def apply_clip_burn_srt(
+    src: Path,
+    out: Path,
+    srt: Path,
+    *,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Burn SRT captions into video. Not CapCut auto-captions / AI karaoke."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    if not srt.is_file():
+        return {"ok": False, "error": f"missing srt: {srt}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # ffmpeg subtitles filter: escape Windows drive colon / backslashes
+    esc = str(srt.resolve()).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        f"subtitles='{esc}'",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "srt": _rel(srt),
+        "honesty": "SRT burn-in = ffmpeg subtitles filter. Not CapCut auto-captions / AI karaoke.",
+    }
+
+
+def reencode_export_preset(
+    src: Path,
+    out: Path,
+    *,
+    preset: str | None = "social",
+) -> dict[str, Any]:
+    """Re-encode with draft/social/hq CRF. Not CapCut Space cloud encode."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    key = resolve_export_preset(preset)
+    meta = EXPORT_PRESETS[key]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-c:v",
+        "libx264",
+        "-preset",
+        str(meta["preset"]),
+        "-crf",
+        str(int(meta["crf"])),
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", f"-b:a", f"{int(meta['audio_k'])}k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "export_preset": key,
+        "crf": meta["crf"],
+        "honesty": "Export preset = local CRF re-encode. Not CapCut cloud / Space.",
+    }
+
+
 def apply_clip_volume(
     src: Path,
     out: Path,
@@ -2531,6 +2852,47 @@ def render_timeline(
                 if pr.get("ok"):
                     piece = pp
                     keyframe_notes.append(f"{c.get('name') or i}:pip={pr.get('corner')}")
+        try:
+            grain = float(c.get("grain") or 0.0)
+        except (TypeError, ValueError):
+            grain = 0.0
+        if grain >= 1.0:
+            gr = work / f"gr_{i:03d}.mp4"
+            grr = apply_clip_grain(piece, gr, strength=grain, fps=fps)
+            if grr.get("ok") and not grr.get("skipped"):
+                piece = gr
+                keyframe_notes.append(f"{c.get('name') or i}:grain={grain:.0f}")
+        try:
+            letterbox = float(c.get("letterbox") or c.get("letterbox_pct") or 0.0)
+        except (TypeError, ValueError):
+            letterbox = 0.0
+        if letterbox >= 1.0:
+            lb = work / f"lb_{i:03d}.mp4"
+            lbr = apply_clip_letterbox(
+                piece, lb, bar_pct=letterbox, width=width, height=height, fps=fps
+            )
+            if lbr.get("ok") and not lbr.get("skipped"):
+                piece = lb
+                keyframe_notes.append(f"{c.get('name') or i}:letterbox={letterbox:.0f}%")
+        try:
+            glow = float(c.get("glow") or 0.0)
+        except (TypeError, ValueError):
+            glow = 0.0
+        if glow >= 0.05:
+            gl = work / f"gl_{i:03d}.mp4"
+            glr = apply_clip_glow(piece, gl, strength=glow, fps=fps)
+            if glr.get("ok") and not glr.get("skipped"):
+                piece = gl
+                keyframe_notes.append(f"{c.get('name') or i}:glow={glow:.2f}")
+        srt_ref = str(c.get("srt_rel") or c.get("srt_path") or "").strip()
+        if srt_ref:
+            srt_src = resolve_user_path(srt_ref)
+            if srt_src and srt_src.is_file():
+                sb = work / f"srt_{i:03d}.mp4"
+                sbr = apply_clip_burn_srt(piece, sb, srt_src, fps=fps)
+                if sbr.get("ok"):
+                    piece = sb
+                    keyframe_notes.append(f"{c.get('name') or i}:srt")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"
@@ -2551,12 +2913,25 @@ def render_timeline(
                 bedded,
                 volume=float(prefs.get("music_volume") or 0.12),
                 mood=str(prefs.get("music_mood") or "warm"),
+                duck=bool(prefs.get("bed_duck")),
+                duck_db=float(prefs.get("bed_duck_db") or -10.0),
             )
             if mb.get("ok"):
                 out = bedded
                 result["music_bed"] = mb
                 result["path"] = str(out)
                 result["rel"] = _rel(out)
+        ep = resolve_export_preset(str(prefs.get("export_preset") or "social"))
+        if ep in {"social", "hq"}:
+            enc = MONTAGE_OUT / f"edit_{stamp}_{ep}.mp4"
+            er = reencode_export_preset(out, enc, preset=ep)
+            if er.get("ok"):
+                out = enc
+                result["export_preset"] = er
+                result["path"] = str(out)
+                result["rel"] = _rel(out)
+        else:
+            result["export_preset"] = {"ok": True, "export_preset": "draft", "skipped": True}
         latest = MONTAGE_OUT / "edit_latest.mp4"
         shutil.copy2(out, latest)
         result["latest"] = str(latest)

@@ -998,6 +998,7 @@ def action_media_image_clip(body: dict[str, Any]) -> dict[str, Any]:
 def action_timeline_get() -> dict[str, Any]:
     from content_engine.montage import (
         list_aspects,
+        list_export_presets,
         list_transitions,
         load_montage_prefs,
         load_timeline,
@@ -1011,25 +1012,34 @@ def action_timeline_get() -> dict[str, Any]:
         "timeline": tl,
         "transitions": list_transitions(),
         "aspects": list_aspects(),
+        "export_presets": list_export_presets(),
         "montage_prefs": prefs,
         "stats": timeline_stats(),
     }
 
 
 def action_montage_prefs(patch: dict[str, Any] | None = None) -> dict[str, Any]:
-    from content_engine.montage import list_aspects, list_transitions, load_montage_prefs, save_montage_prefs
+    from content_engine.montage import (
+        list_aspects,
+        list_export_presets,
+        list_transitions,
+        load_montage_prefs,
+        save_montage_prefs,
+    )
 
     if patch:
         return {
             **save_montage_prefs(patch),
             "transitions": list_transitions(),
             "aspects": list_aspects(),
+            "export_presets": list_export_presets(),
         }
     return {
         "ok": True,
         "prefs": load_montage_prefs(),
         "transitions": list_transitions(),
         "aspects": list_aspects(),
+        "export_presets": list_export_presets(),
     }
 
 

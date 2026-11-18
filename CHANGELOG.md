@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.51 — 2026-11-18
+
+Batch (one ship):
+- Clip **grain**, **letterbox**, **glow**, **SRT burn-in**
+- Music bed **sidechain duck** + stitch **export presets** (draft/social/hq)
+- Check script `scripts/check_batch_051.ps1`
+
 ## 0.1.50 — 2026-11-18
 
 Batch (one ship):

@@ -10,6 +10,10 @@ from content_engine.montage import (
     apply_clip_keyframes,
     apply_clip_look,
     apply_clip_loop,
+    apply_clip_burn_srt,
+    apply_clip_glow,
+    apply_clip_grain,
+    apply_clip_letterbox,
     apply_clip_loudnorm,
     apply_clip_mirror,
     apply_clip_opacity,
@@ -24,10 +28,13 @@ from content_engine.montage import (
     delete_media,
     image_to_clip,
     list_aspects,
+    list_export_presets,
     list_grade_presets,
     list_media,
     list_transitions,
+    reencode_export_preset,
     resolve_aspect,
+    resolve_export_preset,
     resolve_transition,
     save_montage_prefs,
     save_project,
@@ -315,6 +322,34 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_grain_letterbox_glow_srt_export(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_grain(src, out / "g.mp4", strength=10, fps=12)["ok"]
+    assert apply_clip_letterbox(
+        src, out / "lb.mp4", bar_pct=12, width=320, height=560, fps=12
+    )["ok"]
+    assert apply_clip_glow(src, out / "glow.mp4", strength=0.4, fps=12)["ok"]
+
+    srt = out / "c.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:00,800\nHi\n", encoding="utf-8")
+    assert apply_clip_burn_srt(src, out / "cap.mp4", srt, fps=12)["ok"]
+
+    pack = list_export_presets()
+    assert pack["ok"] and "hq" in pack["presets"]
+    assert resolve_export_preset("nope") == "social"
+    er = reencode_export_preset(src, out / "hq.mp4", preset="hq")
+    assert er["ok"] and er.get("export_preset") == "hq"
+    saved = save_montage_prefs({"export_preset": "draft", "bed_duck": True})
+    assert saved["prefs"]["export_preset"] == "draft"
+    assert saved["prefs"]["bed_duck"] is True
 
 
 def test_save_project(tmp_path, monkeypatch):
