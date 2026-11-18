@@ -18,10 +18,14 @@ from content_engine.montage import (
     apply_clip_chromakey,
     apply_clip_colorhold,
     apply_clip_compress,
+    apply_clip_cartoon,
     apply_clip_cover_blur,
+    apply_clip_deflicker,
     apply_clip_echo,
     apply_clip_edge_fade,
     apply_clip_edges,
+    apply_clip_emboss,
+    apply_clip_film_contrast,
     apply_clip_flash,
     apply_clip_gate,
     apply_clip_glow,
@@ -29,24 +33,34 @@ from content_engine.montage import (
     apply_clip_hue,
     apply_clip_letterbox,
     apply_clip_loudnorm,
+    apply_clip_mono,
     apply_clip_negate,
+    apply_clip_peak_norm,
+    apply_clip_pitch,
     apply_clip_pixelate,
     apply_clip_posterize,
+    apply_clip_reverb,
     apply_clip_rgbshift,
     apply_clip_softlight,
     apply_clip_speed_ramp,
+    apply_clip_stereo_widen,
     apply_clip_tint,
     apply_clip_trails,
+    apply_clip_vibrance,
     apply_clip_watermark,
     clear_timeline_fx,
     copy_clip_fx,
     duplicate_timeline_clip,
+    export_audio_mp3,
+    export_contact_sheet,
     export_waveform_png,
     extract_clip_audio,
     move_timeline_clip,
     randomize_timeline_transition,
+    rename_timeline_clip,
     reverse_timeline_order,
     sort_timeline,
+    swap_timeline_clips,
     apply_clip_mirror,
     apply_clip_opacity,
     apply_clip_overlay_text,
@@ -354,6 +368,36 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_dense_056_look_audio_exports(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_vibrance(src, out / "v.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_film_contrast(src, out / "f.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_deflicker(src, out / "d.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_stereo_widen(src, out / "w.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_pitch(src, out / "p.mp4", semitones=2, fps=12)["ok"]
+    assert apply_clip_cartoon(src, out / "c.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_emboss(src, out / "e.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_mono(src, out / "m.mp4", fps=12)["ok"]
+    assert apply_clip_peak_norm(src, out / "n.mp4", fps=12)["ok"]
+    assert apply_clip_reverb(src, out / "r.mp4", strength=0.4, fps=12)["ok"]
+    assert "smoothleft" in list_transitions()["transitions"]
+
+    save_timeline([{"name": "a"}, {"name": "b"}, {"name": "c"}])
+    assert swap_timeline_clips(a=0, b=2)["ok"]
+    assert rename_timeline_clip(index=0, name="hook")["ok"]
+    latest = out / "edit_latest.mp4"
+    latest.write_bytes(src.read_bytes())
+    assert export_audio_mp3()["ok"]
+    assert export_contact_sheet(cols=2, rows=2)["ok"]
 
 
 def test_dense_055_trails_audio_wave_fps(tmp_path, monkeypatch):

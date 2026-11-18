@@ -1151,13 +1151,17 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         list_grade_presets,
         load_timeline,
         move_timeline_clip,
+        export_audio_mp3,
+        export_contact_sheet,
         export_waveform_png,
         randomize_timeline_transition,
+        rename_timeline_clip,
         resolve_user_path,
         reverse_timeline_order,
         shuffle_timeline,
         sort_timeline,
         strip_clip_audio,
+        swap_timeline_clips,
         timeline_stats,
     )
 
@@ -1216,6 +1220,23 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         )
     if action == "reverse":
         return reverse_timeline_order()
+    if action == "swap":
+        return swap_timeline_clips(
+            a=int(body.get("a") if body.get("a") is not None else 0),
+            b=int(body.get("b") if body.get("b") is not None else 1),
+        )
+    if action == "rename":
+        return rename_timeline_clip(
+            index=int(body.get("index") or 0),
+            name=str(body.get("name") or ""),
+        )
+    if action == "mp3":
+        return export_audio_mp3()
+    if action == "sheet":
+        return export_contact_sheet(
+            cols=int(body.get("cols") or 3),
+            rows=int(body.get("rows") or 3),
+        )
     if action == "clear_fx":
         idx = body.get("index")
         return clear_timeline_fx(index=int(idx) if idx is not None else None)

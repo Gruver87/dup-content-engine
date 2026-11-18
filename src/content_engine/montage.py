@@ -73,6 +73,10 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
     "hrslice": {"label": "H-slice →", "label_ru": "H-slice →", "xfade": "hrslice", "note": "slice"},
     "vuslice": {"label": "V-slice ↑", "label_ru": "V-slice ↑", "xfade": "vuslice", "note": "slice"},
     "vdslice": {"label": "V-slice ↓", "label_ru": "V-slice ↓", "xfade": "vdslice", "note": "slice"},
+    "smoothleft": {"label": "Smooth ←", "label_ru": "Smooth ←", "xfade": "smoothleft", "note": "smooth wipe"},
+    "smoothright": {"label": "Smooth →", "label_ru": "Smooth →", "xfade": "smoothright", "note": "smooth wipe"},
+    "smoothup": {"label": "Smooth ↑", "label_ru": "Smooth ↑", "xfade": "smoothup", "note": "smooth wipe"},
+    "smoothdown": {"label": "Smooth ↓", "label_ru": "Smooth ↓", "xfade": "smoothdown", "note": "smooth wipe"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -2483,6 +2487,16 @@ CLIP_FX_KEYS: tuple[str, ...] = (
     "softlight",
     "colorhold",
     "colorhold_on",
+    "vibrance",
+    "film_contrast",
+    "deflicker",
+    "stereo_widen",
+    "pitch",
+    "cartoon",
+    "emboss",
+    "mono",
+    "peak_norm",
+    "reverb",
 )
 
 
@@ -3742,6 +3756,393 @@ def apply_clip_colorhold(
     }
 
 
+def _af_encode(src: Path, out: Path, af: str) -> bool:
+    run_ffmpeg(
+        ["-i", str(src), "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "128k", str(out)]
+    )
+    return out.is_file()
+
+
+def apply_clip_vibrance(
+    src: Path, out: Path, *, strength: float = 0.4, fps: int = 30
+) -> dict[str, Any]:
+    """Boost mid saturation. Not CapCut vibrance AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.05:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    sat = 1.0 + st * 0.85
+    ok = _vf_encode(src, out, f"eq=saturation={sat:.3f}", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Vibrance = eq saturation. Not CapCut vibrance AI.",
+    }
+
+
+def apply_clip_film_contrast(
+    src: Path, out: Path, *, strength: float = 0.4, fps: int = 30
+) -> dict[str, Any]:
+    """Punchy contrast + slight crush. Not CapCut film LUT packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.05:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    contrast = 1.0 + st * 0.45
+    brightness = -0.02 * st
+    ok = _vf_encode(
+        src, out, f"eq=contrast={contrast:.3f}:brightness={brightness:.3f}", fps=fps
+    )
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Film contrast = eq contrast/brightness. Not CapCut film LUT packs.",
+    }
+
+
+def apply_clip_deflicker(
+    src: Path, out: Path, *, strength: float = 0.5, fps: int = 30
+) -> dict[str, Any]:
+    """Deflicker filter. Not CapCut AI stabilize light."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    size = max(2, int(2 + st * 6))
+    ok = _vf_encode(src, out, f"deflicker=mode=am:size={size}", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Deflicker = ffmpeg deflicker. Not CapCut AI light stabilize.",
+    }
+
+
+def apply_clip_stereo_widen(
+    src: Path, out: Path, *, strength: float = 0.4, fps: int = 30
+) -> dict[str, Any]:
+    """Stereo widen via extrastereo. Not CapCut spatial audio AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    m = 0.2 + st * 2.0
+    ok = _af_encode(src, out, f"extrastereo=m={m:.2f}")
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Stereo widen = extrastereo. Not CapCut spatial / AI widen.",
+    }
+
+
+def apply_clip_pitch(
+    src: Path, out: Path, *, semitones: float = 0.0, fps: int = 30
+) -> dict[str, Any]:
+    """Pitch shift via asetrate+atempo. Not CapCut AI voice change."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(-6.0, min(6.0, float(semitones or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or abs(st) < 0.15:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    factor = 2 ** (st / 12.0)
+    # raise/lower rate then atempo back toward original duration
+    tempo = 1.0 / factor
+    tempo = max(0.5, min(2.0, tempo))
+    af = f"asetrate=44100*{factor:.5f},aresample=44100,atempo={tempo:.5f}"
+    ok = _af_encode(src, out, af)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "semitones": st,
+        "honesty": "Pitch = asetrate+atempo. Not CapCut AI voice changer.",
+    }
+
+
+def apply_clip_cartoon(
+    src: Path, out: Path, *, strength: float = 0.45, fps: int = 30
+) -> dict[str, Any]:
+    """Cartoon-ish bilateral + edges. Not CapCut AI cartoon."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    sigma = 0.08 + st * 0.2
+    opac = 0.2 + st * 0.55
+    fc = (
+        f"[0:v]split=2[b][e];[b]bilateral=sigmaS=3:sigmaR={sigma:.3f}[s];"
+        f"[e]edgedetect=mode=colormix[ed];"
+        f"[s][ed]blend=all_mode=multiply:all_opacity={opac:.3f}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Cartoon = bilateral+edges. Not CapCut AI cartoonize.",
+    }
+
+
+def apply_clip_emboss(
+    src: Path, out: Path, *, strength: float = 0.45, fps: int = 30
+) -> dict[str, Any]:
+    """Emboss convolution. Not CapCut relief packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    # mix emboss with original
+    opac = 0.25 + st * 0.6
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    fc = (
+        f"[0:v]split=2[base][e];[e]format=gray,edgedetect=low=0.05:high=0.15[ed];"
+        f"[base][ed]blend=all_mode=overlay:all_opacity={opac:.3f}[v]"
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Emboss = edgedetect overlay. Not CapCut relief FX packs.",
+    }
+
+
+def apply_clip_mono(src: Path, out: Path, *, fps: int = 30) -> dict[str, Any]:
+    """Downmix audio to mono. Not CapCut stem tools."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    ok = _af_encode(src, out, "pan=mono|c0=0.5*c0+0.5*c1")
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Mono = pan downmix. Not CapCut stem / AI mono.",
+    }
+
+
+def apply_clip_peak_norm(
+    src: Path, out: Path, *, target_db: float = -1.0, fps: int = 30
+) -> dict[str, Any]:
+    """Peak normalize via volume detect skip — simple volume=replaygain-ish peak.
+    Uses volume filter with assumed gain; honesty: not 2-pass. Not CapCut AI loudness."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    # single-pass: dynaudnorm as practical peak/leveler
+    ok = _af_encode(src, out, "dynaudnorm=f=75:g=15")
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "target_db": float(target_db),
+        "honesty": "Peak/level = dynaudnorm single-pass. Not CapCut AI loudness / 2-pass true peak.",
+    }
+
+
+def apply_clip_reverb(
+    src: Path, out: Path, *, strength: float = 0.4, fps: int = 30
+) -> dict[str, Any]:
+    """Longer aecho as cheap reverb. Not CapCut reverb halls."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    d1 = int(40 + st * 80)
+    d2 = int(120 + st * 280)
+    dec = 0.3 + st * 0.4
+    af = f"aecho=0.8:0.7:{d1}|{d2}:{dec:.2f}|{dec * 0.7:.2f}"
+    ok = _af_encode(src, out, af)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Reverb = multi-delay aecho. Not CapCut hall / AI space.",
+    }
+
+
+def swap_timeline_clips(*, a: int, b: int) -> dict[str, Any]:
+    """Swap two clip indices."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    try:
+        i, j = int(a), int(b)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index", "timeline": tl}
+    if i < 0 or j < 0 or i >= len(clips) or j >= len(clips):
+        return {"ok": False, "error": "index out of range", "timeline": tl}
+    clips[i], clips[j] = clips[j], clips[i]
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {**saved, "swapped": [i, j], "honesty": "Swap = index exchange. Not CapCut magnetic AI."}
+
+
+def rename_timeline_clip(*, index: int, name: str) -> dict[str, Any]:
+    """Rename one timeline clip label."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    try:
+        i = int(index)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad index", "timeline": tl}
+    if i < 0 or i >= len(clips):
+        return {"ok": False, "error": "index out of range", "timeline": tl}
+    clips[i] = {**clips[i], "name": (name or "").strip()[:80] or clips[i].get("name") or f"clip{i}"}
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {**saved, "index": i, "name": clips[i]["name"]}
+
+
+def export_audio_mp3() -> dict[str, Any]:
+    """Export latest stitch audio as MP3. Not CapCut AI stem export."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    out = MONTAGE_OUT / "edit_audio.mp3"
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(mp4).get("streams") or [])
+    )
+    if not has_audio:
+        return {"ok": False, "error": "no audio in latest stitch"}
+    run_ffmpeg(["-i", str(mp4), "-vn", "-c:a", "libmp3lame", "-q:a", "4", str(out)])
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "MP3 export = -vn lame. Not CapCut stem / AI separate.",
+    }
+
+
+def export_contact_sheet(*, cols: int = 3, rows: int = 3) -> dict[str, Any]:
+    """Contact sheet JPEG from latest stitch. Not CapCut AI storyboard."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    out = MONTAGE_OUT / "edit_sheet.jpg"
+    c = max(2, min(5, int(cols or 3)))
+    r = max(2, min(5, int(rows or 3)))
+    run_ffmpeg(
+        [
+            "-i",
+            str(mp4),
+            "-vf",
+            f"fps=1/{max(0.3, (float(media_duration_sec(mp4) or 3.0) / (c * r))):.3f},scale=240:-1,tile={c}x{r}",
+            "-frames:v",
+            "1",
+            "-q:v",
+            "3",
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "cols": c,
+        "rows": r,
+        "honesty": "Contact sheet = tile frames. Not CapCut AI storyboard.",
+    }
+
+
 def add_black_gap_clip(*, duration_sec: float = 0.5, width: int = 1080, height: int = 1920) -> dict[str, Any]:
     """Append a black gap clip to the timeline. Not CapCut filler AI."""
     _ensure_dirs()
@@ -4542,6 +4943,98 @@ def render_timeline(
             if chr_.get("ok"):
                 piece = ch
                 keyframe_notes.append(f"{c.get('name') or i}:colorhold")
+        try:
+            vibrance = float(c.get("vibrance") or 0.0)
+        except (TypeError, ValueError):
+            vibrance = 0.0
+        if vibrance >= 0.05:
+            vb = work / f"vb_{i:03d}.mp4"
+            vbr = apply_clip_vibrance(piece, vb, strength=vibrance, fps=fps)
+            if vbr.get("ok") and not vbr.get("skipped"):
+                piece = vb
+                keyframe_notes.append(f"{c.get('name') or i}:vibrance")
+        try:
+            film_c = float(c.get("film_contrast") or 0.0)
+        except (TypeError, ValueError):
+            film_c = 0.0
+        if film_c >= 0.05:
+            fc_ = work / f"fc_{i:03d}.mp4"
+            fcr = apply_clip_film_contrast(piece, fc_, strength=film_c, fps=fps)
+            if fcr.get("ok") and not fcr.get("skipped"):
+                piece = fc_
+                keyframe_notes.append(f"{c.get('name') or i}:film")
+        try:
+            deflicker = float(c.get("deflicker") or 0.0)
+        except (TypeError, ValueError):
+            deflicker = 0.0
+        if deflicker >= 0.08:
+            df = work / f"df_{i:03d}.mp4"
+            dfr = apply_clip_deflicker(piece, df, strength=deflicker, fps=fps)
+            if dfr.get("ok") and not dfr.get("skipped"):
+                piece = df
+                keyframe_notes.append(f"{c.get('name') or i}:deflicker")
+        try:
+            widen = float(c.get("stereo_widen") or 0.0)
+        except (TypeError, ValueError):
+            widen = 0.0
+        if widen >= 0.08:
+            sw = work / f"sw_{i:03d}.mp4"
+            swr = apply_clip_stereo_widen(piece, sw, strength=widen, fps=fps)
+            if swr.get("ok") and not swr.get("skipped"):
+                piece = sw
+                keyframe_notes.append(f"{c.get('name') or i}:widen")
+        try:
+            pitch = float(c.get("pitch") or 0.0)
+        except (TypeError, ValueError):
+            pitch = 0.0
+        if abs(pitch) >= 0.15:
+            pt = work / f"pt_{i:03d}.mp4"
+            ptr = apply_clip_pitch(piece, pt, semitones=pitch, fps=fps)
+            if ptr.get("ok") and not ptr.get("skipped"):
+                piece = pt
+                keyframe_notes.append(f"{c.get('name') or i}:pitch={pitch:.1f}")
+        try:
+            cartoon = float(c.get("cartoon") or 0.0)
+        except (TypeError, ValueError):
+            cartoon = 0.0
+        if cartoon >= 0.08:
+            ct = work / f"ct_{i:03d}.mp4"
+            ctr = apply_clip_cartoon(piece, ct, strength=cartoon, fps=fps)
+            if ctr.get("ok") and not ctr.get("skipped"):
+                piece = ct
+                keyframe_notes.append(f"{c.get('name') or i}:cartoon")
+        try:
+            emboss = float(c.get("emboss") or 0.0)
+        except (TypeError, ValueError):
+            emboss = 0.0
+        if emboss >= 0.08:
+            em = work / f"em_{i:03d}.mp4"
+            emr = apply_clip_emboss(piece, em, strength=emboss, fps=fps)
+            if emr.get("ok") and not emr.get("skipped"):
+                piece = em
+                keyframe_notes.append(f"{c.get('name') or i}:emboss")
+        if bool(c.get("mono")):
+            mo = work / f"mo_{i:03d}.mp4"
+            mor = apply_clip_mono(piece, mo, fps=fps)
+            if mor.get("ok") and not mor.get("skipped"):
+                piece = mo
+                keyframe_notes.append(f"{c.get('name') or i}:mono")
+        if bool(c.get("peak_norm")):
+            pn = work / f"pn_{i:03d}.mp4"
+            pnr = apply_clip_peak_norm(piece, pn, fps=fps)
+            if pnr.get("ok") and not pnr.get("skipped"):
+                piece = pn
+                keyframe_notes.append(f"{c.get('name') or i}:peak_norm")
+        try:
+            reverb = float(c.get("reverb") or 0.0)
+        except (TypeError, ValueError):
+            reverb = 0.0
+        if reverb >= 0.08:
+            rv = work / f"rv_{i:03d}.mp4"
+            rvr = apply_clip_reverb(piece, rv, strength=reverb, fps=fps)
+            if rvr.get("ok") and not rvr.get("skipped"):
+                piece = rv
+                keyframe_notes.append(f"{c.get('name') or i}:reverb")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

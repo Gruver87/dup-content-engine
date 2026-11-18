@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.56 — 2026-11-18
+
+Dense batch (~14):
+- xfade: smooth L/R/U/D
+- Clip: vibrance, film contrast, deflicker, widen, pitch, cartoon, emboss, mono, peak_norm, reverb
+- Timeline: swap, rename · export MP3 + contact sheet
+- Check script `scripts/check_batch_056.ps1`
+
 ## 0.1.55 — 2026-11-18
 
 Dense batch (~12):
