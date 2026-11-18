@@ -13,13 +13,17 @@ from content_engine.montage import (
     apply_clip_burn_srt,
     add_black_gap_clip,
     apply_clip_audio_filter,
+    apply_clip_bass_boost,
     apply_clip_boxblur,
+    apply_clip_chromakey,
+    apply_clip_colorhold,
     apply_clip_compress,
     apply_clip_cover_blur,
     apply_clip_echo,
     apply_clip_edge_fade,
     apply_clip_edges,
     apply_clip_flash,
+    apply_clip_gate,
     apply_clip_glow,
     apply_clip_grain,
     apply_clip_hue,
@@ -29,15 +33,19 @@ from content_engine.montage import (
     apply_clip_pixelate,
     apply_clip_posterize,
     apply_clip_rgbshift,
+    apply_clip_softlight,
     apply_clip_speed_ramp,
     apply_clip_tint,
+    apply_clip_trails,
     apply_clip_watermark,
     clear_timeline_fx,
     copy_clip_fx,
     duplicate_timeline_clip,
+    export_waveform_png,
     extract_clip_audio,
     move_timeline_clip,
     randomize_timeline_transition,
+    reverse_timeline_order,
     sort_timeline,
     apply_clip_mirror,
     apply_clip_opacity,
@@ -346,6 +354,38 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_dense_055_trails_audio_wave_fps(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_trails(src, out / "tr.mp4", frames=3, fps=12)["ok"]
+    assert apply_clip_chromakey(src, out / "ck.mp4", fps=12)["ok"]
+    assert apply_clip_bass_boost(src, out / "bass.mp4", strength=0.5, fps=12)["ok"]
+    assert apply_clip_gate(src, out / "gate.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_softlight(src, out / "sl.mp4", strength=0.4, fps=12)["ok"]
+    assert apply_clip_colorhold(src, out / "ch.mp4", hue=30, fps=12)["ok"]
+
+    pack = list_transitions()
+    for key in ("horzclose", "hlslice", "vdslice"):
+        assert key in pack["transitions"]
+
+    saved = save_montage_prefs({"fps": 24})
+    assert saved["prefs"]["fps"] == 24
+    save_timeline([{"name": "a"}, {"name": "b"}])
+    rev = reverse_timeline_order()
+    assert rev["ok"] and [c["name"] for c in rev["timeline"]["clips"]] == ["b", "a"]
+
+    latest = out / "edit_latest.mp4"
+    latest.write_bytes(src.read_bytes())
+    wave = export_waveform_png(width=320, height=80)
+    assert wave["ok"] and Path(wave["path"]).is_file()
 
 
 def test_dense_054_fx_and_timeline_ops(tmp_path, monkeypatch):

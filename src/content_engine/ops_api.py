@@ -1151,8 +1151,10 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         list_grade_presets,
         load_timeline,
         move_timeline_clip,
+        export_waveform_png,
         randomize_timeline_transition,
         resolve_user_path,
+        reverse_timeline_order,
         shuffle_timeline,
         sort_timeline,
         strip_clip_audio,
@@ -1207,6 +1209,13 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
             duration_sec=float(body.get("duration_sec") or 2.0),
             width=int(body.get("width") or 360),
         )
+    if action == "wave":
+        return export_waveform_png(
+            width=int(body.get("width") or 640),
+            height=int(body.get("height") or 120),
+        )
+    if action == "reverse":
+        return reverse_timeline_order()
     if action == "clear_fx":
         idx = body.get("index")
         return clear_timeline_fx(index=int(idx) if idx is not None else None)

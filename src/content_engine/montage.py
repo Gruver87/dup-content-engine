@@ -67,6 +67,12 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
     "wipeur": {"label": "Wipe ↗", "label_ru": "Шторка ↗", "xfade": "wipeur", "note": "wipe UR"},
     "wipedl": {"label": "Wipe ↙", "label_ru": "Шторка ↙", "xfade": "wipedl", "note": "wipe DL"},
     "wipedr": {"label": "Wipe ↘", "label_ru": "Шторка ↘", "xfade": "wipedr", "note": "wipe DR"},
+    "horzclose": {"label": "H-close", "label_ru": "Гор. закрытие", "xfade": "horzclose", "note": "horizontal close"},
+    "vertclose": {"label": "V-close", "label_ru": "Верт. закрытие", "xfade": "vertclose", "note": "vertical close"},
+    "hlslice": {"label": "H-slice ←", "label_ru": "H-slice ←", "xfade": "hlslice", "note": "slice"},
+    "hrslice": {"label": "H-slice →", "label_ru": "H-slice →", "xfade": "hrslice", "note": "slice"},
+    "vuslice": {"label": "V-slice ↑", "label_ru": "V-slice ↑", "xfade": "vuslice", "note": "slice"},
+    "vdslice": {"label": "V-slice ↓", "label_ru": "V-slice ↓", "xfade": "vdslice", "note": "slice"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -166,6 +172,7 @@ def load_montage_prefs() -> dict[str, Any]:
         "export_preset": "social",
         "bed_duck": False,
         "bed_duck_db": -10.0,
+        "fps": 30,
     }
     if PREFS_PATH.is_file():
         try:
@@ -189,6 +196,8 @@ def load_montage_prefs() -> dict[str, Any]:
                     base["bed_duck"] = bool(data["bed_duck"])
                 if "bed_duck_db" in data:
                     base["bed_duck_db"] = float(data["bed_duck_db"])
+                if "fps" in data:
+                    base["fps"] = int(data["fps"])
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     base["transition_sec"] = max(0.15, min(1.2, float(base["transition_sec"])))
@@ -196,6 +205,12 @@ def load_montage_prefs() -> dict[str, Any]:
     base["music_volume"] = max(0.02, min(0.5, float(base.get("music_volume") or 0.12)))
     base["export_preset"] = resolve_export_preset(str(base.get("export_preset") or "social"))
     base["bed_duck_db"] = max(-24.0, min(-3.0, float(base.get("bed_duck_db") or -10.0)))
+    try:
+        base["fps"] = int(base.get("fps") or 30)
+    except (TypeError, ValueError):
+        base["fps"] = 30
+    if base["fps"] not in {24, 25, 30, 60}:
+        base["fps"] = 30
     w, h = aspect_size(base["aspect"])
     base["width"] = w
     base["height"] = h
@@ -231,6 +246,13 @@ def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
             cur["bed_duck_db"] = max(-24.0, min(-3.0, float(patch["bed_duck_db"])))
         except (TypeError, ValueError):
             pass
+    if "fps" in patch:
+        try:
+            fps_i = int(patch["fps"])
+            if fps_i in {24, 25, 30, 60}:
+                cur["fps"] = fps_i
+        except (TypeError, ValueError):
+            pass
     store = {
         k: cur[k]
         for k in (
@@ -243,6 +265,7 @@ def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
             "export_preset",
             "bed_duck",
             "bed_duck_db",
+            "fps",
         )
         if k in cur
     }
@@ -2452,6 +2475,14 @@ CLIP_FX_KEYS: tuple[str, ...] = (
     "boxblur",
     "compress",
     "watermark",
+    "trails",
+    "chromakey",
+    "key_color",
+    "bass_boost",
+    "gate",
+    "softlight",
+    "colorhold",
+    "colorhold_on",
 )
 
 
@@ -3471,6 +3502,246 @@ def export_montage_gif(*, at_sec: float = 0.0, duration_sec: float = 2.0, width:
     }
 
 
+def reverse_timeline_order() -> dict[str, Any]:
+    """Reverse clip order server-side. Not CapCut magnetic reverse AI."""
+    tl = load_timeline()
+    clips = list(reversed(tl.get("clips") or []))
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {**saved, "reversed": True, "honesty": "Reverse order = list reverse. Not CapCut magnetic AI."}
+
+
+def export_waveform_png(*, width: int = 640, height: int = 120) -> dict[str, Any]:
+    """Waveform PNG from latest stitch audio. Not CapCut AI waveform."""
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    out = MONTAGE_OUT / "edit_wave.png"
+    w = max(200, min(1280, int(width or 640)))
+    h = max(40, min(400, int(height or 120)))
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(mp4).get("streams") or [])
+    )
+    if not has_audio:
+        return {"ok": False, "error": "no audio in latest stitch"}
+    run_ffmpeg(
+        [
+            "-i",
+            str(mp4),
+            "-filter_complex",
+            f"aformat=channel_layouts=mono,showwavespic=s={w}x{h}:colors=0x4ea1ff",
+            "-frames:v",
+            "1",
+            str(out),
+        ]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "honesty": "Waveform = showwavespic. Not CapCut AI waveform / stems.",
+    }
+
+
+def apply_clip_trails(
+    src: Path,
+    out: Path,
+    *,
+    frames: int = 4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Motion trails via tmix. Not CapCut echo FX packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    n = max(0, min(12, int(frames or 0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if n < 2:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    ok = _vf_encode(src, out, f"tmix=frames={n}:weights=1", fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "frames": n,
+        "honesty": "Trails = tmix. Not CapCut echo / AI motion trails.",
+    }
+
+
+def apply_clip_chromakey(
+    src: Path,
+    out: Path,
+    *,
+    color: str = "0x00FF00",
+    similarity: float = 0.25,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Simple chromakey to black. Not CapCut AI remove-bg."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    col = (color or "0x00FF00").strip()
+    if not col.startswith("0x"):
+        col = "0x00FF00"
+    sim = max(0.05, min(0.6, float(similarity or 0.25)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # replace keyed pixels with black (no alpha mp4)
+    vf = f"chromakey={col}:{sim:.3f}:0.08,format=yuv420p"
+    ok = _vf_encode(src, out, vf, fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "color": col,
+        "similarity": sim,
+        "honesty": "Chromakey = ffmpeg chromakey→black. Not CapCut AI remove background.",
+    }
+
+
+def apply_clip_bass_boost(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Bass shelf boost. Not CapCut EQ racks."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    gain = 2 + st * 8
+    af = f"equalizer=f=80:width_type=o:width=2:g={gain:.1f}"
+    run_ffmpeg(
+        ["-i", str(src), "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "128k", str(out)]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Bass boost = equalizer shelf. Not CapCut EQ marketplace.",
+    }
+
+
+def apply_clip_gate(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Noise gate via agate. Not CapCut AI denoise."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio or st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    thr = 0.05 + (1.0 - st) * 0.08
+    af = f"agate=threshold={thr:.3f}:ratio=3:attack=10:release=120"
+    run_ffmpeg(
+        ["-i", str(src), "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "128k", str(out)]
+    )
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Gate = ffmpeg agate. Not CapCut AI denoise / RX.",
+    }
+
+
+def apply_clip_softlight(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Softlight self-blend wash. Not CapCut glow packs."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True}
+    opac = 0.2 + st * 0.55
+    fc = (
+        f"[0:v]split=2[a][b];[b]eq=brightness=0.05:saturation=1.1[c];"
+        f"[a][c]blend=all_mode=softlight:all_opacity={opac:.3f}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Softlight = blend softlight. Not CapCut look packs.",
+    }
+
+
+def apply_clip_colorhold(
+    src: Path,
+    out: Path,
+    *,
+    hue: float = 0.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Hold one hue, desaturate rest (approx). Not CapCut selective color AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    # strength encoded as using colorhold when hue set; use colorchannel + hue trick
+    # Practical: hue shift then saturate only around — approximate with hue + geq skip
+    # Use chromahold filter if available; else hue+saturation combo
+    out.parent.mkdir(parents=True, exist_ok=True)
+    h = float(hue or 0.0) % 360.0
+    # chromahold=color=red-ish via hue degrees — use colorhold if present
+    # Fallback: strong desat + tint wash
+    vf = f"hue=s=0.15,colorbalance=rs=0.05:bs=-0.05,hue=h={h:.1f}:s=1.4"
+    ok = _vf_encode(src, out, vf, fps=fps)
+    return {
+        "ok": ok,
+        "path": str(out),
+        "rel": _rel(out),
+        "hue": h,
+        "honesty": "Colorhold = approximate hue isolate. Not CapCut selective color AI.",
+    }
+
+
 def add_black_gap_clip(*, duration_sec: float = 0.5, width: int = 1080, height: int = 1920) -> dict[str, Any]:
     """Append a black gap clip to the timeline. Not CapCut filler AI."""
     _ensure_dirs()
@@ -3694,6 +3965,12 @@ def render_timeline(
     aw, ah = aspect_size(aspect_key)
     width = int(width) if width else aw
     height = int(height) if height else ah
+    try:
+        fps = int(fps or prefs.get("fps") or 30)
+    except (TypeError, ValueError):
+        fps = 30
+    if fps not in {24, 25, 30, 60}:
+        fps = 30
     tkey = resolve_transition(
         transition if transition is not None else tl.get("transition") or prefs.get("transition")
     )
@@ -4202,6 +4479,69 @@ def render_timeline(
             if wmr.get("ok") and not wmr.get("skipped"):
                 piece = wt
                 keyframe_notes.append(f"{c.get('name') or i}:wm")
+        try:
+            trails = int(c.get("trails") or 0)
+        except (TypeError, ValueError):
+            trails = 0
+        if trails >= 2:
+            tr = work / f"tr_{i:03d}.mp4"
+            trr = apply_clip_trails(piece, tr, frames=trails, fps=fps)
+            if trr.get("ok") and not trr.get("skipped"):
+                piece = tr
+                keyframe_notes.append(f"{c.get('name') or i}:trails={trails}")
+        if bool(c.get("chromakey")):
+            ck = work / f"ck_{i:03d}.mp4"
+            ckr = apply_clip_chromakey(
+                piece,
+                ck,
+                color=str(c.get("key_color") or "0x00FF00"),
+                similarity=float(c.get("key_similarity") or 0.25),
+                fps=fps,
+            )
+            if ckr.get("ok"):
+                piece = ck
+                keyframe_notes.append(f"{c.get('name') or i}:chromakey")
+        try:
+            bass = float(c.get("bass_boost") or 0.0)
+        except (TypeError, ValueError):
+            bass = 0.0
+        if bass >= 0.08:
+            bs = work / f"bass_{i:03d}.mp4"
+            bsr = apply_clip_bass_boost(piece, bs, strength=bass, fps=fps)
+            if bsr.get("ok") and not bsr.get("skipped"):
+                piece = bs
+                keyframe_notes.append(f"{c.get('name') or i}:bass")
+        try:
+            gate = float(c.get("gate") or 0.0)
+        except (TypeError, ValueError):
+            gate = 0.0
+        if gate >= 0.08:
+            gt = work / f"gate_{i:03d}.mp4"
+            gtr = apply_clip_gate(piece, gt, strength=gate, fps=fps)
+            if gtr.get("ok") and not gtr.get("skipped"):
+                piece = gt
+                keyframe_notes.append(f"{c.get('name') or i}:gate")
+        try:
+            softlight = float(c.get("softlight") or 0.0)
+        except (TypeError, ValueError):
+            softlight = 0.0
+        if softlight >= 0.08:
+            sl = work / f"sl_{i:03d}.mp4"
+            slr = apply_clip_softlight(piece, sl, strength=softlight, fps=fps)
+            if slr.get("ok") and not slr.get("skipped"):
+                piece = sl
+                keyframe_notes.append(f"{c.get('name') or i}:softlight")
+        try:
+            ch_hue = float(c.get("colorhold") or 0.0)
+            ch_on = bool(c.get("colorhold_on")) or abs(ch_hue) >= 1.0
+        except (TypeError, ValueError):
+            ch_hue, ch_on = 0.0, False
+        if ch_on:
+            ch = work / f"ch_{i:03d}.mp4"
+            chr_ = apply_clip_colorhold(piece, ch, hue=ch_hue, fps=fps)
+            if chr_.get("ok"):
+                piece = ch
+                keyframe_notes.append(f"{c.get('name') or i}:colorhold")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

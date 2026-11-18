@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.55 — 2026-11-18
+
+Dense batch (~12):
+- xfade: horz/vert close + H/V slices
+- Clip: trails, chromakey, bass, gate, softlight, colorhold
+- Prefs **FPS** 24/25/30/60 · Wave PNG · reverse timeline server
+- Check script `scripts/check_batch_055.ps1`
+
 ## 0.1.54 — 2026-11-18
 
 Dense batch (~15):

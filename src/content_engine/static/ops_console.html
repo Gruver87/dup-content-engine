@@ -1019,6 +1019,30 @@ body {
             <label class="field" style="flex:1"><span data-i18n="clipWatermark">Watermark</span>
               <input id="clipWatermark" type="text" placeholder="DUP" style="min-width:80px"/>
             </label>
+            <label class="field"><span data-i18n="clipTrails">Trails</span>
+              <input id="clipTrails" type="number" min="0" max="12" step="1" value="0" style="min-width:60px"/>
+            </label>
+            <label class="check"><input type="checkbox" id="clipChromakey"/> <span data-i18n="clipChromakey">Chroma</span></label>
+            <label class="field"><span data-i18n="clipBass">Bass</span>
+              <input id="clipBass" type="number" min="0" max="1" step="0.05" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipGate">Gate</span>
+              <input id="clipGate" type="number" min="0" max="1" step="0.05" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipSoftlight">Softlight</span>
+              <input id="clipSoftlight" type="number" min="0" max="1" step="0.05" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="clipColorhold">Colorhold°</span>
+              <input id="clipColorhold" type="number" min="0" max="359" step="5" value="0" style="min-width:60px"/>
+            </label>
+            <label class="field"><span data-i18n="montageFps">FPS</span>
+              <select id="montageFps" style="min-width:70px">
+                <option value="24">24</option>
+                <option value="25">25</option>
+                <option value="30" selected>30</option>
+                <option value="60">60</option>
+              </select>
+            </label>
             <button class="btn ghost" id="btnApplyKf" data-i18n="btnApplyKf">Apply KF</button>
           </div>
           <div class="row" style="margin-top:10px">
@@ -1050,6 +1074,8 @@ body {
             <button class="btn ghost" id="btnRandTrans" data-i18n="btnRandTrans">Rand xfade</button>
             <button class="btn ghost" id="btnGap" data-i18n="btnGap">+ gap</button>
             <button class="btn ghost" id="btnGif" data-i18n="btnGif">GIF</button>
+            <button class="btn ghost" id="btnWave" data-i18n="btnWave">Wave</button>
+            <button class="btn ghost" id="btnRevServer" data-i18n="btnRevServer">Rev server</button>
             <button class="btn ghost" id="btnExtractAudio" data-i18n="btnExtractAudio">Extract audio</button>
             <button class="btn ghost" id="btnStripAudio" data-i18n="btnStripAudio">Strip audio</button>
             <button class="btn ghost" id="btnThumb" data-i18n="btnThumb">Thumb</button>
@@ -1328,7 +1354,7 @@ const I18N = {
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", clipPixelate: "Pixelate", clipNegate: "Negate", clipEdges: "Edges", clipCoverBlur: "Cover blur", clipEcho: "Echo", clipHue: "Hue°", clipBoxblur: "Boxblur", clipCompress: "Compress", clipWatermark: "Watermark", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Сброс FX", btnMoveTop: "В начало", btnSortDur: "Sort dur", btnCopyFx: "Copy FX→", btnRandTrans: "Rand xfade", btnGap: "+ gap", btnGif: "GIF", btnExtractAudio: "Извлечь audio", btnStripAudio: "Strip audio", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP угол", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", clipPixelate: "Pixelate", clipNegate: "Negate", clipEdges: "Edges", clipCoverBlur: "Cover blur", clipEcho: "Echo", clipHue: "Hue°", clipBoxblur: "Boxblur", clipCompress: "Compress", clipWatermark: "Watermark", clipTrails: "Trails", clipChromakey: "Chroma", clipBass: "Bass", clipGate: "Gate", clipSoftlight: "Softlight", clipColorhold: "Colorhold°", montageFps: "FPS", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Сброс FX", btnMoveTop: "В начало", btnSortDur: "Sort dur", btnCopyFx: "Copy FX→", btnRandTrans: "Rand xfade", btnGap: "+ gap", btnGif: "GIF", btnWave: "Wave", btnRevServer: "Rev server", btnExtractAudio: "Извлечь audio", btnStripAudio: "Strip audio", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnShuffle: "Shuffle", btnTlStats: "Длительность", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1490,7 +1516,7 @@ const I18N = {
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", clipPixelate: "Pixelate", clipNegate: "Negate", clipEdges: "Edges", clipCoverBlur: "Cover blur", clipEcho: "Echo", clipHue: "Hue°", clipBoxblur: "Boxblur", clipCompress: "Compress", clipWatermark: "Watermark", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Clear FX", btnMoveTop: "To top", btnSortDur: "Sort dur", btnCopyFx: "Copy FX→", btnRandTrans: "Rand xfade", btnGap: "+ gap", btnGif: "GIF", btnExtractAudio: "Extract audio", btnStripAudio: "Strip audio", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", clipLoudnorm: "Loudnorm", clipPip: "PIP rel", clipPipCorner: "PIP corner", clipGrain: "Grain", clipLetterbox: "Letterbox %", clipGlow: "Glow", clipSrt: "SRT rel", clipFlash: "Flash", clipPosterize: "Posterize", clipRgbshift: "RGB shift", clipEdgeFade: "Edge fade", clipSpeedStart: "Ramp start", clipSpeedEnd: "Ramp end", clipTint: "Tint", clipHighpass: "HP Hz", clipLowpass: "LP Hz", clipPan: "Pan", clipPixelate: "Pixelate", clipNegate: "Negate", clipEdges: "Edges", clipCoverBlur: "Cover blur", clipEcho: "Echo", clipHue: "Hue°", clipBoxblur: "Boxblur", clipCompress: "Compress", clipWatermark: "Watermark", clipTrails: "Trails", clipChromakey: "Chroma", clipBass: "Bass", clipGate: "Gate", clipSoftlight: "Softlight", clipColorhold: "Colorhold°", montageFps: "FPS", montageBedDuck: "Duck bed", montageExport: "Export", btnClearFx: "Clear FX", btnMoveTop: "To top", btnSortDur: "Sort dur", btnCopyFx: "Copy FX→", btnRandTrans: "Rand xfade", btnGap: "+ gap", btnGif: "GIF", btnWave: "Wave", btnRevServer: "Rev server", btnExtractAudio: "Extract audio", btnStripAudio: "Strip audio", btnSplit: "Split", btnRevOrder: "Reverse order", btnShuffle: "Shuffle", btnTlStats: "Duration", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2468,6 +2494,12 @@ function renderTimeline() {
     if ($("clipBoxblur")) $("clipBoxblur").value = c.boxblur || 0;
     if ($("clipCompress")) $("clipCompress").value = c.compress || 0;
     if ($("clipWatermark")) $("clipWatermark").value = c.watermark || "";
+    if ($("clipTrails")) $("clipTrails").value = c.trails || 0;
+    if ($("clipChromakey")) $("clipChromakey").checked = !!c.chromakey;
+    if ($("clipBass")) $("clipBass").value = c.bass_boost || 0;
+    if ($("clipGate")) $("clipGate").value = c.gate || 0;
+    if ($("clipSoftlight")) $("clipSoftlight").value = c.softlight || 0;
+    if ($("clipColorhold")) $("clipColorhold").value = c.colorhold || 0;
   }
 }
 $("btnApplyKf")?.addEventListener("click", () => {
@@ -2531,6 +2563,13 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.boxblur = Math.max(0, Math.min(32, parseInt($("clipBoxblur")?.value || "0", 10) || 0));
   c.compress = Math.max(0, Math.min(1, parseFloat($("clipCompress")?.value || "0") || 0));
   c.watermark = ($("clipWatermark")?.value || "").trim();
+  c.trails = Math.max(0, Math.min(12, parseInt($("clipTrails")?.value || "0", 10) || 0));
+  c.chromakey = !!$("clipChromakey")?.checked;
+  c.bass_boost = Math.max(0, Math.min(1, parseFloat($("clipBass")?.value || "0") || 0));
+  c.gate = Math.max(0, Math.min(1, parseFloat($("clipGate")?.value || "0") || 0));
+  c.softlight = Math.max(0, Math.min(1, parseFloat($("clipSoftlight")?.value || "0") || 0));
+  c.colorhold = Math.max(0, Math.min(359, parseFloat($("clipColorhold")?.value || "0") || 0));
+  c.colorhold_on = c.colorhold >= 1;
   TIMELINE[TL_INDEX] = c;
   renderTimeline();
   setDirty(true);
@@ -2582,6 +2621,9 @@ async function loadMedia() {
     if ($("montageBedDuck")) $("montageBedDuck").checked = !!tlFull.montage_prefs.bed_duck;
     if ($("montageExport") && tlFull.montage_prefs.export_preset) {
       $("montageExport").value = tlFull.montage_prefs.export_preset;
+    }
+    if ($("montageFps") && tlFull.montage_prefs.fps) {
+      $("montageFps").value = String(tlFull.montage_prefs.fps);
     }
   }
   renderTransGrid();
@@ -2915,6 +2957,8 @@ $("btnGap")?.addEventListener("click", () => {
   tlAction("gap", { duration_sec: 0.5, width: w, height: h }, t("btnGap"));
 });
 $("btnGif")?.addEventListener("click", () => tlAction("gif", { duration_sec: 2, width: 360 }, t("btnGif")));
+$("btnWave")?.addEventListener("click", () => tlAction("wave", {}, t("btnWave")));
+$("btnRevServer")?.addEventListener("click", () => tlAction("reverse", {}, t("btnRevServer")));
 $("btnStripAudio")?.addEventListener("click", () => {
   if (TL_INDEX == null) return toast("select clip");
   tlAction("strip_audio", { index: TL_INDEX }, t("btnStripAudio"));
@@ -3077,10 +3121,11 @@ $("btnRenderTl").onclick = async () => {
   const music_volume = Math.max(0.02, Math.min(0.5, parseFloat($("montageBedVol")?.value || "0.12") || 0.12));
   const bed_duck = !!$("montageBedDuck")?.checked;
   const export_preset = $("montageExport")?.value || "social";
+  const fps = parseInt($("montageFps")?.value || "30", 10) || 30;
   try {
     await api("/api/montage/prefs", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ aspect, music_bed, music_volume, bed_duck, export_preset }),
+      body: JSON.stringify({ aspect, music_bed, music_volume, bed_duck, export_preset, fps }),
     });
   } catch (_) {}
   const r = await api("/api/timeline/render", {
