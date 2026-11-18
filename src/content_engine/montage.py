@@ -44,6 +44,13 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
     "circleclose": {"label": "Circle close", "label_ru": "Круг ↓", "xfade": "circleclose", "note": "iris close"},
     "pixelize": {"label": "Pixelize", "label_ru": "Пиксели", "xfade": "pixelize", "note": "stylized"},
     "hblur": {"label": "H-blur", "label_ru": "Блюр", "xfade": "hblur", "note": "blur wipe"},
+    "diagtl": {"label": "Diag ↖", "label_ru": "Диаг ↖", "xfade": "diagtl", "note": "diagonal"},
+    "diagtr": {"label": "Diag ↗", "label_ru": "Диаг ↗", "xfade": "diagtr", "note": "diagonal"},
+    "horzopen": {"label": "H-open", "label_ru": "Гор. раскрытие", "xfade": "horzopen", "note": "horizontal open"},
+    "vertopen": {"label": "V-open", "label_ru": "Верт. раскрытие", "xfade": "vertopen", "note": "vertical open"},
+    "fadegrays": {"label": "Gray fade", "label_ru": "Серый fade", "xfade": "fadegrays", "note": "gray flash"},
+    "distance": {"label": "Distance", "label_ru": "Дистанция", "xfade": "distance", "note": "zoom dissolve"},
+    "radial": {"label": "Radial", "label_ru": "Радиал", "xfade": "radial", "note": "radial wipe"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -2368,6 +2375,311 @@ def reencode_export_preset(
     }
 
 
+CLIP_FX_KEYS: tuple[str, ...] = (
+    "fade_in",
+    "fade_out",
+    "zoom",
+    "zoom_dir",
+    "grade_preset",
+    "speed",
+    "reverse",
+    "volume",
+    "mute",
+    "audio_fade_in",
+    "audio_fade_out",
+    "overlay_text",
+    "freeze_sec",
+    "flip_h",
+    "flip_v",
+    "mirror",
+    "brightness",
+    "contrast",
+    "saturation",
+    "rotate",
+    "blur",
+    "sharpen",
+    "grayscale",
+    "vignette",
+    "loops",
+    "inset_pct",
+    "denoise",
+    "opacity",
+    "deshake",
+    "loudnorm",
+    "pip_rel",
+    "pip_path",
+    "pip_corner",
+    "pip_scale",
+    "grain",
+    "letterbox",
+    "letterbox_pct",
+    "glow",
+    "srt_rel",
+    "srt_path",
+    "flash",
+    "posterize",
+    "rgbshift",
+    "edge_fade",
+)
+
+
+def clear_timeline_fx(*, index: int | None = None) -> dict[str, Any]:
+    """Strip FX fields from one clip or all clips. Not CapCut reset templates."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    if not clips:
+        return {"ok": False, "error": "empty timeline", "timeline": tl}
+    cleared = 0
+    if index is not None:
+        try:
+            i = int(index)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "bad index", "timeline": tl}
+        if i < 0 or i >= len(clips):
+            return {"ok": False, "error": "index out of range", "timeline": tl}
+        for k in CLIP_FX_KEYS:
+            clips[i].pop(k, None)
+        cleared = 1
+    else:
+        for c in clips:
+            for k in CLIP_FX_KEYS:
+                if k in c:
+                    c.pop(k, None)
+                    cleared += 1
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "cleared_fields": cleared,
+        "honesty": "Clear FX = drop local timeline FX keys. Not CapCut template reset.",
+    }
+
+
+def apply_clip_flash(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.55,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Brief white flash at clip start (fade from white). Not CapCut flash pack."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "strength": 0.0}
+    dur = max(0.12, min(0.45, 0.12 + st * 0.33))
+    # fade=t=in:st=0:d=…:color=white
+    vf = f"fade=t=in:st=0:d={dur:.3f}:color=white"
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Flash = fade-in from white. Not CapCut flash effect packs.",
+    }
+
+
+def apply_clip_posterize(
+    src: Path,
+    out: Path,
+    *,
+    levels: int = 6,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Posterize / reduce color levels. Not CapCut comic AI looks."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    lv = max(2, min(16, int(levels or 6)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if lv >= 15:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "levels": lv}
+    # lutrgb posterize (no dedicated posterize filter on all ffmpeg builds)
+    step = max(1, 256 // lv)
+    vf = (
+        f"lutrgb=r='trunc(val/{step})*{step}':"
+        f"g='trunc(val/{step})*{step}':"
+        f"b='trunc(val/{step})*{step}'"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        vf,
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "levels": lv,
+        "honesty": "Posterize = lutrgb level steps. Not CapCut comic / AI stylize.",
+    }
+
+
+def apply_clip_rgbshift(
+    src: Path,
+    out: Path,
+    *,
+    amount: float = 4.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Chromatic fringe via rgbashift. Not CapCut glitch packs / AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    am = max(0.0, min(24.0, float(amount or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if am < 0.5:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "amount": 0.0}
+    rh = int(round(am))
+    bh = -int(round(am * 0.75))
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        f"rgbashift=rh={rh}:bh={bh}:rv=0:bv=0",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "amount": am,
+        "honesty": "RGB shift = rgbashift fringe. Not CapCut glitch marketplace.",
+    }
+
+
+def apply_clip_edge_fade(
+    src: Path,
+    out: Path,
+    *,
+    strength: float = 0.4,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Soft edge fade via vignette angle. Not CapCut edge blur AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    st = max(0.0, min(1.0, float(strength or 0.0)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if st < 0.08:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "strength": 0.0}
+    # stronger = larger vignette angle
+    angle = 0.35 + st * 0.9
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(src),
+        "-vf",
+        f"vignette=angle={angle:.3f}:mode=forward",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "strength": st,
+        "honesty": "Edge fade = vignette angle. Not CapCut edge blur / AI mattes.",
+    }
+
+
+def extract_clip_audio(
+    src: Path,
+    out: Path | None = None,
+) -> dict[str, Any]:
+    """Extract AAC/WAV audio from a clip into library. Not CapCut stem split AI."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio:
+        return {"ok": False, "error": "no audio stream"}
+    _ensure_dirs()
+    dest = out or (LIBRARY / "imports" / f"audio_{uuid.uuid4().hex[:8]}.m4a")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg(["-i", str(src), "-vn", "-c:a", "aac", "-b:a", "160k", str(dest)])
+    return {
+        "ok": dest.is_file(),
+        "path": str(dest),
+        "rel": _rel(dest),
+        "honesty": "Extract audio = ffmpeg -vn. Not CapCut stem separation / AI vocals.",
+    }
+
+
 def apply_clip_volume(
     src: Path,
     out: Path,
@@ -2893,6 +3205,46 @@ def render_timeline(
                 if sbr.get("ok"):
                     piece = sb
                     keyframe_notes.append(f"{c.get('name') or i}:srt")
+        try:
+            flash = float(c.get("flash") or 0.0)
+        except (TypeError, ValueError):
+            flash = 0.0
+        if flash >= 0.08:
+            fl = work / f"fl_{i:03d}.mp4"
+            flr = apply_clip_flash(piece, fl, strength=flash, fps=fps)
+            if flr.get("ok") and not flr.get("skipped"):
+                piece = fl
+                keyframe_notes.append(f"{c.get('name') or i}:flash={flash:.2f}")
+        try:
+            posterize = int(c.get("posterize") or 0)
+        except (TypeError, ValueError):
+            posterize = 0
+        if 2 <= posterize <= 14:
+            po = work / f"po_{i:03d}.mp4"
+            por = apply_clip_posterize(piece, po, levels=posterize, fps=fps)
+            if por.get("ok") and not por.get("skipped"):
+                piece = po
+                keyframe_notes.append(f"{c.get('name') or i}:posterize={posterize}")
+        try:
+            rgbshift = float(c.get("rgbshift") or 0.0)
+        except (TypeError, ValueError):
+            rgbshift = 0.0
+        if rgbshift >= 0.5:
+            rg = work / f"rgb_{i:03d}.mp4"
+            rgr = apply_clip_rgbshift(piece, rg, amount=rgbshift, fps=fps)
+            if rgr.get("ok") and not rgr.get("skipped"):
+                piece = rg
+                keyframe_notes.append(f"{c.get('name') or i}:rgbshift={rgbshift:.1f}")
+        try:
+            edge_fade = float(c.get("edge_fade") or 0.0)
+        except (TypeError, ValueError):
+            edge_fade = 0.0
+        if edge_fade >= 0.08:
+            ef = work / f"ef_{i:03d}.mp4"
+            efr = apply_clip_edge_fade(piece, ef, strength=edge_fade, fps=fps)
+            if efr.get("ok") and not efr.get("skipped"):
+                piece = ef
+                keyframe_notes.append(f"{c.get('name') or i}:edge_fade={edge_fade:.2f}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

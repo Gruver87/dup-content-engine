@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.52 — 2026-11-18
+
+Batch (one ship):
+- More xfade: **diag / horzopen / vertopen / fadegrays / distance / radial**
+- Clip **flash**, **posterize**, **RGB shift**, **edge fade**
+- Timeline **Clear FX** + **Extract audio**
+- Check script `scripts/check_batch_052.ps1`
+
 ## 0.1.51 — 2026-11-18
 
 Batch (one ship):

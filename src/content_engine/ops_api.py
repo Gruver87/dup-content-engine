@@ -1141,9 +1141,12 @@ def action_montage_smoke(body: dict[str, Any] | None = None) -> dict[str, Any]:
 def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any]:
     from content_engine.montage import (
         add_timeline_marker,
+        clear_timeline_fx,
         clear_timeline_markers,
+        extract_clip_audio,
         list_grade_presets,
         load_timeline,
+        resolve_user_path,
         shuffle_timeline,
         timeline_stats,
     )
@@ -1164,6 +1167,26 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         return shuffle_timeline(seed=int(seed) if seed is not None else None)
     if action == "stats":
         return timeline_stats()
+    if action == "clear_fx":
+        idx = body.get("index")
+        return clear_timeline_fx(index=int(idx) if idx is not None else None)
+    if action == "extract_audio":
+        rel = str(body.get("rel") or body.get("path") or "").strip()
+        src = resolve_user_path(rel) if rel else None
+        if not src:
+            tl = load_timeline()
+            clips = tl.get("clips") or []
+            idx = body.get("index")
+            try:
+                i = int(idx) if idx is not None else 0
+            except (TypeError, ValueError):
+                i = 0
+            if 0 <= i < len(clips):
+                cand = str(clips[i].get("rel") or clips[i].get("path") or "")
+                src = resolve_user_path(cand)
+        if not src or not src.is_file():
+            return {"ok": False, "error": "need clip rel/path or timeline index"}
+        return extract_clip_audio(src)
     tl = load_timeline()
     return {
         "ok": True,

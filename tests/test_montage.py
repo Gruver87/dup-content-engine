@@ -11,10 +11,16 @@ from content_engine.montage import (
     apply_clip_look,
     apply_clip_loop,
     apply_clip_burn_srt,
+    apply_clip_edge_fade,
+    apply_clip_flash,
     apply_clip_glow,
     apply_clip_grain,
     apply_clip_letterbox,
     apply_clip_loudnorm,
+    apply_clip_posterize,
+    apply_clip_rgbshift,
+    clear_timeline_fx,
+    extract_clip_audio,
     apply_clip_mirror,
     apply_clip_opacity,
     apply_clip_overlay_text,
@@ -322,6 +328,35 @@ def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
     assert sorted(names) == ["a", "b", "c"]
     # deterministic seed should move order off original for this set
     assert names != ["a", "b", "c"] or len(set(names)) == 3
+
+
+def test_flash_posterize_rgb_edge_clear_extract(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    lib = tmp_path / "library"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    monkeypatch.setattr("content_engine.montage.LIBRARY", lib)
+    out.mkdir(parents=True)
+    lib.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    assert apply_clip_flash(src, out / "fl.mp4", strength=0.5, fps=12)["ok"]
+    assert apply_clip_posterize(src, out / "po.mp4", levels=5, fps=12)["ok"]
+    assert apply_clip_rgbshift(src, out / "rgb.mp4", amount=6, fps=12)["ok"]
+    assert apply_clip_edge_fade(src, out / "ef.mp4", strength=0.4, fps=12)["ok"]
+    ex = extract_clip_audio(src)
+    assert ex["ok"] and Path(ex["path"]).is_file()
+
+    pack = list_transitions()
+    for key in ("diagtl", "horzopen", "fadegrays", "radial"):
+        assert key in pack["transitions"]
+
+    save_timeline([{"name": "a", "path": "a.mp4", "flash": 0.5, "grain": 10, "glow": 0.3}])
+    clr = clear_timeline_fx()
+    assert clr["ok"] and "flash" not in clr["timeline"]["clips"][0]
+    assert "grain" not in clr["timeline"]["clips"][0]
 
 
 def test_grain_letterbox_glow_srt_export(tmp_path, monkeypatch):
