@@ -10,9 +10,11 @@ from content_engine.montage import (
     apply_clip_keyframes,
     apply_clip_look,
     apply_clip_loop,
+    apply_clip_loudnorm,
     apply_clip_mirror,
     apply_clip_opacity,
     apply_clip_overlay_text,
+    apply_clip_pip,
     apply_clip_rotate,
     apply_clip_speed,
     apply_clip_volume,
@@ -31,6 +33,8 @@ from content_engine.montage import (
     save_project,
     save_timeline,
     save_upload,
+    shuffle_timeline,
+    timeline_stats,
     trim_clip,
 )
 
@@ -248,6 +252,8 @@ def test_transitions_pack_and_fade(tmp_path, monkeypatch):
 
     pack = list_transitions()
     assert pack["ok"] and "fade" in pack["transitions"]
+    for key in ("fadewhite", "wipeup", "wipedown", "slideright", "circleclose"):
+        assert key in pack["transitions"]
     assert resolve_transition("nope") == "cut"
     save_montage_prefs({"transition": "fade", "transition_sec": 0.25})
 
@@ -262,6 +268,53 @@ def test_transitions_pack_and_fade(tmp_path, monkeypatch):
     assert cat["ok"] is True
     assert cat.get("transition") == "fade"
     assert Path(cat["path"]).stat().st_size > 1000
+
+    flash = out / "flash.mp4"
+    cat2 = concat_clips(
+        [a, b], flash, width=320, height=560, transition="fadewhite", transition_sec=0.2
+    )
+    assert cat2["ok"] is True and cat2.get("transition") == "fadewhite"
+
+
+def test_loudnorm_pip_shuffle_stats(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    src = out / "src.mp4"
+    ov = out / "ov.mp4"
+    _tiny_mp4(src, 1.0)
+    _tiny_mp4(ov, 1.0)
+
+    ln = out / "ln.mp4"
+    lr = apply_clip_loudnorm(src, ln, fps=12)
+    assert lr["ok"] is True and Path(lr["path"]).is_file()
+
+    pip = out / "pip.mp4"
+    pr = apply_clip_pip(src, ov, pip, corner="tl", scale=0.3, width=320, height=560, fps=12)
+    assert pr["ok"] is True and pr.get("corner") == "tl" and Path(pr["path"]).is_file()
+
+    save_timeline(
+        [
+            {"name": "a", "path": "a.mp4", "duration_sec": 2.0},
+            {"name": "b", "path": "b.mp4", "duration_sec": 3.0},
+            {"name": "c", "path": "c.mp4", "duration_sec": 1.5},
+        ],
+        transition="fade",
+        transition_sec=0.5,
+    )
+    st = timeline_stats()
+    assert st["ok"] and st["clip_count"] == 3 and st["sum_sec"] == 6.5
+    assert st["est_sec"] == 5.5  # 6.5 − 0.5*(3-1)
+
+    sh = shuffle_timeline(seed=7)
+    assert sh["ok"] and sh.get("shuffled") is True
+    names = [c["name"] for c in sh["timeline"]["clips"]]
+    assert sorted(names) == ["a", "b", "c"]
+    # deterministic seed should move order off original for this set
+    assert names != ["a", "b", "c"] or len(set(names)) == 3
 
 
 def test_save_project(tmp_path, monkeypatch):

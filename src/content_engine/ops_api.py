@@ -996,7 +996,13 @@ def action_media_image_clip(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_timeline_get() -> dict[str, Any]:
-    from content_engine.montage import list_aspects, list_transitions, load_montage_prefs, load_timeline
+    from content_engine.montage import (
+        list_aspects,
+        list_transitions,
+        load_montage_prefs,
+        load_timeline,
+        timeline_stats,
+    )
 
     tl = load_timeline()
     prefs = load_montage_prefs()
@@ -1006,6 +1012,7 @@ def action_timeline_get() -> dict[str, Any]:
         "transitions": list_transitions(),
         "aspects": list_aspects(),
         "montage_prefs": prefs,
+        "stats": timeline_stats(),
     }
 
 
@@ -1127,6 +1134,8 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         clear_timeline_markers,
         list_grade_presets,
         load_timeline,
+        shuffle_timeline,
+        timeline_stats,
     )
 
     body = body or {}
@@ -1140,8 +1149,18 @@ def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any
         return clear_timeline_markers()
     if action == "presets":
         return list_grade_presets()
+    if action == "shuffle":
+        seed = body.get("seed")
+        return shuffle_timeline(seed=int(seed) if seed is not None else None)
+    if action == "stats":
+        return timeline_stats()
     tl = load_timeline()
-    return {"ok": True, "markers": tl.get("markers") or [], "count": len(tl.get("markers") or [])}
+    return {
+        "ok": True,
+        "markers": tl.get("markers") or [],
+        "count": len(tl.get("markers") or []),
+        "stats": timeline_stats(),
+    }
 
 
 def action_montage_send(body: dict[str, Any] | None = None) -> dict[str, Any]:

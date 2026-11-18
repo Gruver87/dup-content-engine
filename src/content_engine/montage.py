@@ -31,12 +31,19 @@ _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac"}
 TRANSITIONS: dict[str, dict[str, Any]] = {
     "cut": {"label": "Cut", "label_ru": "Резко", "xfade": None, "note": "hard join"},
     "fade": {"label": "Fade", "label_ru": "Затухание", "xfade": "fade", "note": "black crossfade"},
+    "fadewhite": {"label": "Flash", "label_ru": "Вспышка", "xfade": "fadewhite", "note": "white flash"},
+    "fadeblack": {"label": "Fade black", "label_ru": "В чёрный", "xfade": "fadeblack", "note": "to black"},
     "dissolve": {"label": "Dissolve", "label_ru": "Наплыв", "xfade": "dissolve", "note": "overlap blend"},
     "wipeleft": {"label": "Wipe ←", "label_ru": "Шторка ←", "xfade": "wipeleft", "note": "wipe"},
     "wiperight": {"label": "Wipe →", "label_ru": "Шторка →", "xfade": "wiperight", "note": "wipe"},
+    "wipeup": {"label": "Wipe ↑", "label_ru": "Шторка ↑", "xfade": "wipeup", "note": "wipe up"},
+    "wipedown": {"label": "Wipe ↓", "label_ru": "Шторка ↓", "xfade": "wipedown", "note": "wipe down"},
     "slideleft": {"label": "Slide", "label_ru": "Сдвиг", "xfade": "slideleft", "note": "slide"},
+    "slideright": {"label": "Slide →", "label_ru": "Сдвиг →", "xfade": "slideright", "note": "slide right"},
     "circleopen": {"label": "Circle", "label_ru": "Круг", "xfade": "circleopen", "note": "iris"},
+    "circleclose": {"label": "Circle close", "label_ru": "Круг ↓", "xfade": "circleclose", "note": "iris close"},
     "pixelize": {"label": "Pixelize", "label_ru": "Пиксели", "xfade": "pixelize", "note": "stylized"},
+    "hblur": {"label": "H-blur", "label_ru": "Блюр", "xfade": "hblur", "note": "blur wipe"},
 }
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
@@ -706,6 +713,61 @@ def add_timeline_marker(
 def clear_timeline_markers() -> dict[str, Any]:
     tl = load_timeline()
     return save_timeline(list(tl.get("clips") or []), markers=[])
+
+
+def shuffle_timeline(*, seed: int | None = None) -> dict[str, Any]:
+    """Randomize clip order (local). Not CapCut auto-beat rearrange."""
+    import random
+
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    if len(clips) < 2:
+        return {"ok": False, "error": "need ≥2 clips to shuffle", "timeline": tl}
+    rng = random.Random(seed)
+    rng.shuffle(clips)
+    saved = save_timeline(clips, markers=list(tl.get("markers") or []))
+    return {
+        **saved,
+        "shuffled": True,
+        "honesty": "Shuffle = random clip order. Not CapCut beat-match rearrange.",
+    }
+
+
+def timeline_stats() -> dict[str, Any]:
+    """Estimate timeline duration from clip duration_sec fields (+ markers)."""
+    tl = load_timeline()
+    clips = tl.get("clips") or []
+    total = 0.0
+    known = 0
+    unknown = 0
+    for c in clips:
+        try:
+            d = c.get("duration_sec")
+            if d is None:
+                unknown += 1
+                continue
+            total += max(0.0, float(d))
+            known += 1
+        except (TypeError, ValueError):
+            unknown += 1
+    # subtract xfade overlaps roughly if not cut
+    tkey = resolve_transition(tl.get("transition"))
+    tsec = float(tl.get("transition_sec") or 0.35)
+    overlaps = 0.0
+    if tkey != "cut" and known >= 2:
+        overlaps = tsec * (known - 1)
+    est = max(0.0, total - overlaps)
+    return {
+        "ok": True,
+        "clip_count": len(clips),
+        "known_durations": known,
+        "unknown_durations": unknown,
+        "sum_sec": round(total, 3),
+        "est_sec": round(est, 3),
+        "transition": tkey,
+        "markers": len(tl.get("markers") or []),
+        "honesty": "Duration = sum of duration_sec (− xfade overlap guess). Probe missing lengths separately.",
+    }
 
 
 def delete_media(path_or_rel: str) -> dict[str, Any]:
@@ -1861,6 +1923,130 @@ def apply_clip_freeze(
     }
 
 
+def apply_clip_loudnorm(
+    src: Path,
+    out: Path,
+    *,
+    target_i: float = -16.0,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Single-pass loudnorm (broadcast-ish). Not CapCut AI enhance / RX."""
+    if not src.is_file():
+        return {"ok": False, "error": f"missing: {src}"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
+    )
+    if not has_audio:
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "skipped": True, "reason": "no audio"}
+    ti = max(-24.0, min(-9.0, float(target_i or -16.0)))
+    args = [
+        "-i",
+        str(src),
+        "-c:v",
+        "copy",
+        "-af",
+        f"loudnorm=I={ti:.1f}:TP=-1.5:LRA=11",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        str(out),
+    ]
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "target_i": ti,
+        "honesty": "Loudnorm = ffmpeg loudnorm single-pass. Not CapCut AI audio enhance.",
+    }
+
+
+def apply_clip_pip(
+    base: Path,
+    overlay: Path,
+    out: Path,
+    *,
+    corner: str = "br",
+    scale: float = 0.28,
+    width: int | None = None,
+    height: int | None = None,
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Picture-in-picture: overlay scaled into a corner of base.
+
+    Honesty: fixed corner PIP — not CapCut tracking PIP / keyframed position.
+    """
+    if not base.is_file():
+        return {"ok": False, "error": f"missing base: {base}"}
+    if not overlay.is_file():
+        return {"ok": False, "error": f"missing overlay: {overlay}"}
+    w = int(width or 1080)
+    h = int(height or 1920)
+    sc = max(0.12, min(0.5, float(scale or 0.28)))
+    corner = (corner or "br").strip().lower()
+    pad = 24
+    ow, oh = int(w * sc), int(h * sc)
+    pos = {
+        "br": f"main_w-overlay_w-{pad}:{pad}",
+        "bl": f"{pad}:main_h-overlay_h-{pad}",
+        "tr": f"main_w-overlay_w-{pad}:{pad}",
+        "tl": f"{pad}:{pad}",
+    }.get(corner, f"main_w-overlay_w-{pad}:main_h-overlay_h-{pad}")
+    if corner == "br":
+        pos = f"main_w-overlay_w-{pad}:main_h-overlay_h-{pad}"
+    elif corner == "bl":
+        pos = f"{pad}:main_h-overlay_h-{pad}"
+    elif corner == "tr":
+        pos = f"main_w-overlay_w-{pad}:{pad}"
+    else:
+        pos = f"{pad}:{pad}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fc = (
+        f"[0:v]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}[base];"
+        f"[1:v]scale={ow}:{oh}:force_original_aspect_ratio=increase,crop={ow}:{oh}[pip];"
+        f"[base][pip]overlay={pos}[v]"
+    )
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(base).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(base),
+        "-i",
+        str(overlay),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[v]",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-shortest",
+    ]
+    if has_audio:
+        args += ["-map", "0:a", "-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "corner": corner,
+        "scale": sc,
+        "honesty": "PIP = fixed corner overlay. Not CapCut tracking / keyed PIP.",
+    }
+
+
 def apply_clip_volume(
     src: Path,
     out: Path,
@@ -2131,6 +2317,12 @@ def render_timeline(
                 if af_in > 0.04 or af_out > 0.04:
                     vol_tag += f"+af{af_in:.1f}/{af_out:.1f}"
                 keyframe_notes.append(f"{c.get('name') or i}:vol={vol_tag}")
+        if bool(c.get("loudnorm") or c.get("normalize_audio")):
+            ln = work / f"ln_{i:03d}.mp4"
+            lr = apply_clip_loudnorm(piece, ln, fps=fps)
+            if lr.get("ok") and not lr.get("skipped"):
+                piece = ln
+                keyframe_notes.append(f"{c.get('name') or i}:loudnorm")
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
         zoom = float(c.get("zoom") or 1.0)
@@ -2321,6 +2513,24 @@ def render_timeline(
             if opr.get("ok") and not opr.get("skipped"):
                 piece = op
                 keyframe_notes.append(f"{c.get('name') or i}:opacity={opacity:.2f}")
+        pip_ref = str(c.get("pip_rel") or c.get("pip_path") or "").strip()
+        if pip_ref:
+            pip_src = resolve_user_path(pip_ref)
+            if pip_src and pip_src.is_file():
+                pp = work / f"pip_{i:03d}.mp4"
+                pr = apply_clip_pip(
+                    piece,
+                    pip_src,
+                    pp,
+                    corner=str(c.get("pip_corner") or "br"),
+                    scale=float(c.get("pip_scale") or 0.28),
+                    width=width,
+                    height=height,
+                    fps=fps,
+                )
+                if pr.get("ok"):
+                    piece = pp
+                    keyframe_notes.append(f"{c.get('name') or i}:pip={pr.get('corner')}")
         parts.append(piece)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = MONTAGE_OUT / f"edit_{stamp}.mp4"

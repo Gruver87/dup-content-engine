@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.50 — 2026-11-18
+
+Batch (one ship):
+- More **xfade transitions** (fadewhite/black, wipe up/down, slide right, circle close, …)
+- Clip **loudnorm** + corner **PIP** overlay on stitch
+- Timeline **shuffle** + **duration stats**
+- Check script `scripts/check_batch_050.ps1`
+
 ## 0.1.49 — 2026-11-18
 
 Batch (one ship):
