@@ -996,7 +996,7 @@ def action_media_image_clip(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def action_timeline_get() -> dict[str, Any]:
-    from content_engine.montage import list_transitions, load_montage_prefs, load_timeline
+    from content_engine.montage import list_aspects, list_transitions, load_montage_prefs, load_timeline
 
     tl = load_timeline()
     prefs = load_montage_prefs()
@@ -1004,16 +1004,26 @@ def action_timeline_get() -> dict[str, Any]:
         "ok": True,
         "timeline": tl,
         "transitions": list_transitions(),
+        "aspects": list_aspects(),
         "montage_prefs": prefs,
     }
 
 
 def action_montage_prefs(patch: dict[str, Any] | None = None) -> dict[str, Any]:
-    from content_engine.montage import list_transitions, load_montage_prefs, save_montage_prefs
+    from content_engine.montage import list_aspects, list_transitions, load_montage_prefs, save_montage_prefs
 
     if patch:
-        return {**save_montage_prefs(patch), "transitions": list_transitions()}
-    return {"ok": True, "prefs": load_montage_prefs(), "transitions": list_transitions()}
+        return {
+            **save_montage_prefs(patch),
+            "transitions": list_transitions(),
+            "aspects": list_aspects(),
+        }
+    return {
+        "ok": True,
+        "prefs": load_montage_prefs(),
+        "transitions": list_transitions(),
+        "aspects": list_aspects(),
+    }
 
 
 def action_timeline_save(body: dict[str, Any]) -> dict[str, Any]:
@@ -1043,9 +1053,12 @@ def action_timeline_render(body: dict[str, Any] | None = None) -> str:
     def _fn() -> dict[str, Any]:
         from content_engine.montage import render_timeline
 
+        w = body.get("width")
+        h = body.get("height")
         return render_timeline(
-            width=int(body.get("width") or 1080),
-            height=int(body.get("height") or 1920),
+            width=int(w) if w is not None else None,
+            height=int(h) if h is not None else None,
+            aspect=str(body["aspect"]) if body.get("aspect") else None,
             fps=int(body.get("fps") or 30),
             transition=str(body["transition"]) if body.get("transition") else None,
             transition_sec=float(body["transition_sec"]) if body.get("transition_sec") is not None else None,

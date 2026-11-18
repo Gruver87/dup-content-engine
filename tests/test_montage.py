@@ -6,11 +6,14 @@ from content_engine.montage import (
     apply_clip_overlay_text,
     apply_clip_speed,
     apply_clip_volume,
+    aspect_size,
     concat_clips,
     delete_media,
     image_to_clip,
+    list_aspects,
     list_media,
     list_transitions,
+    resolve_aspect,
     resolve_transition,
     save_montage_prefs,
     save_project,
@@ -133,6 +136,23 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     tr = apply_clip_overlay_text(src, txt, text="Hook title", width=320, height=560)
     assert tr["ok"] is True and Path(tr["path"]).is_file()
     assert "CapCut" in (tr.get("honesty") or "")
+
+
+def test_aspect_presets(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+
+    pack = list_aspects()
+    assert pack["ok"] and "1:1" in pack["aspects"]
+    assert resolve_aspect("square") == "1:1"
+    assert aspect_size("16:9") == (1920, 1080)
+    saved = save_montage_prefs({"aspect": "1:1"})
+    assert saved["prefs"]["aspect"] == "1:1"
+    assert saved["prefs"]["width"] == 1080
+    assert saved["prefs"]["height"] == 1080
+    assert "auto-reframe" in (pack.get("honesty") or "").lower() or "CapCut" in (pack.get("honesty") or "")
 
 
 def test_transitions_pack_and_fade(tmp_path, monkeypatch):

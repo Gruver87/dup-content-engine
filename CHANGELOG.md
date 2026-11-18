@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.41 — 2026-11-18
+
+- Montage **aspect presets** (9:16 / 1:1 / 16:9) wired to stitch + prefs — not CapCut auto-reframe AI
+- Console aspect pills now drive canvas size on trim/image/stitch
+
 ## 0.1.40 — 2026-11-18
 
 - Montage **overlay text** burn-in per clip (Pillow) — not CapCut animated titles

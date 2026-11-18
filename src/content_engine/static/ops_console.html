@@ -1135,7 +1135,7 @@ const I18N = {
     applyHookPack: "Применить к теме → script",
     previewHook: "Превью строк",
     gapMontageTitle: "Монтаж · сверка CapCut Desktop",
-    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send/transitions/basic KF. Нет: multi-track bezier, auto-reframe AI.",
+    gapMontageSub: "Есть: import/URL/trim/dup/stitch/save/export/send/transitions/KF/speed/aspect. Нет: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
@@ -1297,7 +1297,7 @@ const I18N = {
     applyHookPack: "Apply to topic → script",
     previewHook: "Preview lines",
     gapMontageTitle: "Montage · CapCut Desktop scan",
-    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send/transitions/basic KF. Missing: multi-track bezier, auto-reframe AI.",
+    gapMontageSub: "Have: import/URL/trim/dup/stitch/save/export/send/transitions/KF/speed/aspect. Missing: multi-track bezier, auto-reframe AI.",
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
@@ -2537,7 +2537,8 @@ $("btnImportUrl").onclick = async () => {
 $("btnTrim").onclick = async () => {
   if (!SELECTED && !TIMELINE.length) return alert(t("emptyMedia"));
   const rel = SELECTED || (TIMELINE[TIMELINE.length-1] && TIMELINE[TIMELINE.length-1].rel);
-  const body = { rel, start_sec: +$("trimStart").value || 0, width: 1080, height: 1920 };
+  const [aw, ah] = aspectDims(currentAspect());
+  const body = { rel, start_sec: +$("trimStart").value || 0, width: aw, height: ah };
   const d = $("trimDur").value;
   if (d !== "" && d != null) body.duration_sec = +d;
   const r = await api("/api/media/trim", {
@@ -2561,7 +2562,7 @@ $("btnImgClip").onclick = async () => {
   const r = await api("/api/media/image-clip", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ rel: SELECTED, duration_sec: +($("trimDur").value || 3), width: 1080, height: 1920 }),
+    body: JSON.stringify({ rel: SELECTED, duration_sec: +($("trimDur").value || 3), width: aspectDims(currentAspect())[0], height: aspectDims(currentAspect())[1] }),
   });
   log($("montageLog"), r);
   if (r.ok && r.rel) {
@@ -2573,16 +2574,38 @@ $("btnImgClip").onclick = async () => {
   }
 };
 
+function currentAspect() {
+  return localStorage.getItem("dupAspect") || "9:16";
+}
+function aspectDims(a) {
+  const map = {"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
+  return map[a] || map["9:16"];
+}
+function applyPhoneAspect(a) {
+  const phone = document.querySelector("#tab-montage .phone") || document.querySelector(".phone");
+  if (!phone) return;
+  const css = {"9:16":"9/16","1:1":"1/1","16:9":"16/9"}[a] || "9/16";
+  phone.style.aspectRatio = css;
+}
+
 $("btnRenderTl").onclick = async () => {
   await persistTimeline({quiet:true});
+  const aspect = currentAspect();
+  const [width, height] = aspectDims(aspect);
+  try {
+    await api("/api/montage/prefs", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ aspect }),
+    });
+  } catch (_) {}
   const r = await api("/api/timeline/render", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({ transition: TRANSITION, transition_sec: TRANSITION_SEC }),
+    body: JSON.stringify({ transition: TRANSITION, transition_sec: TRANSITION_SEC, aspect, width, height }),
   });
   const result = await pollJob(r.job_id, $("montageLog"));
   if (result && result.latest_rel) {
     $("montagePreview").src = mediaUrl(result.latest_rel);
-    setPreview(result.latest_rel, "montage stitch · " + (result.transition || TRANSITION));
+    setPreview(result.latest_rel, "montage stitch · " + (result.transition || TRANSITION) + " · " + (result.aspect || aspect));
   }
   await loadMedia();
 };
@@ -2723,7 +2746,14 @@ if (cs) cs.onclick = async () => {
       const map = {btnAspect916:"9:16", btnAspect11:"1:1", btnAspect169:"16:9"};
       el.classList.toggle("aspect-on", map[id] === v);
     });
-    if (notify) toast("aspect " + v);
+    if (typeof applyPhoneAspect === "function") applyPhoneAspect(v);
+    if (notify) {
+      toast("aspect " + v);
+      api("/api/montage/prefs", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ aspect: v }),
+      }).catch(() => {});
+    }
   }
   const a916=$("btnAspect916"); if(a916) a916.onclick = () => markAspect("9:16", true);
   const a11=$("btnAspect11"); if(a11) a11.onclick = () => markAspect("1:1", true);

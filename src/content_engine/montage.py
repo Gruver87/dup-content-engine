@@ -41,6 +41,45 @@ TRANSITIONS: dict[str, dict[str, Any]] = {
 
 PREFS_PATH = MONTAGE_OUT / "montage_prefs.json"
 
+# Output canvas presets — crop/scale only, not CapCut auto-reframe AI
+ASPECTS: dict[str, dict[str, Any]] = {
+    "9:16": {"label": "9:16", "label_ru": "Вертикаль", "width": 1080, "height": 1920},
+    "1:1": {"label": "1:1", "label_ru": "Квадрат", "width": 1080, "height": 1080},
+    "16:9": {"label": "16:9", "label_ru": "Горизонт", "width": 1920, "height": 1080},
+}
+
+
+def list_aspects() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "aspects": {
+            k: {
+                "label": v["label"],
+                "label_ru": v["label_ru"],
+                "width": v["width"],
+                "height": v["height"],
+            }
+            for k, v in ASPECTS.items()
+        },
+        "default": "9:16",
+        "honesty": (
+            "Aspect = fixed canvas crop/scale on stitch. "
+            "Not CapCut auto-reframe / subject tracking AI."
+        ),
+    }
+
+
+def resolve_aspect(name: str | None) -> str:
+    key = (name or "9:16").strip().lower().replace(" ", "")
+    aliases = {"portrait": "9:16", "vertical": "9:16", "square": "1:1", "landscape": "16:9", "wide": "16:9"}
+    key = aliases.get(key, key)
+    return key if key in ASPECTS else "9:16"
+
+
+def aspect_size(name: str | None = None) -> tuple[int, int]:
+    meta = ASPECTS[resolve_aspect(name)]
+    return int(meta["width"]), int(meta["height"])
+
 
 def list_transitions() -> dict[str, Any]:
     return {
@@ -63,7 +102,7 @@ def resolve_transition(name: str | None) -> str:
 
 
 def load_montage_prefs() -> dict[str, Any]:
-    base = {"transition": "cut", "transition_sec": 0.35}
+    base = {"transition": "cut", "transition_sec": 0.35, "aspect": "9:16"}
     if PREFS_PATH.is_file():
         try:
             data = json.loads(PREFS_PATH.read_text(encoding="utf-8"))
@@ -72,9 +111,15 @@ def load_montage_prefs() -> dict[str, Any]:
                     base["transition"] = str(data["transition"])
                 if "transition_sec" in data:
                     base["transition_sec"] = float(data["transition_sec"])
+                if data.get("aspect"):
+                    base["aspect"] = resolve_aspect(str(data["aspect"]))
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     base["transition_sec"] = max(0.15, min(1.2, float(base["transition_sec"])))
+    base["aspect"] = resolve_aspect(str(base.get("aspect") or "9:16"))
+    w, h = aspect_size(base["aspect"])
+    base["width"] = w
+    base["height"] = h
     return base
 
 
@@ -87,9 +132,13 @@ def save_montage_prefs(patch: dict[str, Any]) -> dict[str, Any]:
             cur["transition_sec"] = max(0.15, min(1.2, float(patch["transition_sec"])))
         except (TypeError, ValueError):
             pass
+    if patch.get("aspect"):
+        cur["aspect"] = resolve_aspect(str(patch["aspect"]))
+    # drop derived size keys before write
+    store = {k: cur[k] for k in ("transition", "transition_sec", "aspect") if k in cur}
     MONTAGE_OUT.mkdir(parents=True, exist_ok=True)
-    PREFS_PATH.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
-    return {"ok": True, "prefs": cur}
+    PREFS_PATH.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
+    return {"ok": True, "prefs": load_montage_prefs()}
 
 
 def _ensure_dirs() -> None:
@@ -961,8 +1010,9 @@ def apply_clip_keyframes(
 
 def render_timeline(
     *,
-    width: int = 1080,
-    height: int = 1920,
+    width: int | None = None,
+    height: int | None = None,
+    aspect: str | None = None,
     fps: int = 30,
     transition: str | None = None,
     transition_sec: float | None = None,
@@ -973,6 +1023,10 @@ def render_timeline(
     if not clips:
         return {"ok": False, "error": "timeline empty — add clips first"}
     prefs = load_montage_prefs()
+    aspect_key = resolve_aspect(aspect or prefs.get("aspect") or "9:16")
+    aw, ah = aspect_size(aspect_key)
+    width = int(width) if width else aw
+    height = int(height) if height else ah
     tkey = resolve_transition(
         transition if transition is not None else tl.get("transition") or prefs.get("transition")
     )
@@ -1097,6 +1151,10 @@ def render_timeline(
         result["latest"] = str(latest)
         result["latest_rel"] = _rel(latest)
         result["keyframes"] = keyframe_notes
+        result["aspect"] = aspect_key
+        result["width"] = width
+        result["height"] = height
+        save_montage_prefs({"aspect": aspect_key})
     return result
 
 
