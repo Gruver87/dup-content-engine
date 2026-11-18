@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+workspace/
+out/
+audit.jsonl
+.hypothesis/
+*.mp4
+!fixtures/**
+.DS_Store
+Thumbs.db
+client_secrets.json
+token.json
+*.pem
+credentials.json
+CHANGELOG.md was already written - good
+
+Also add MANIFEST or ensure package data includes configs? Currently configs/fixtures are at repo root, not packaged - PACKAGE_ROOT = parents[2] from pipeline.py which is:
+- __file__ = src/content_engine/pipeline.py
+- parents[0] = content_engine
+- parents[1] = src
+- parents[2] = package root
+
+Good for editable install from repo. For wheel install, configs won't be found unless we package them. For v0.1.0 editable/dev from git is fine; optionally add package_data later.
+
+Commit and create GitHub repo. User previously wanted push - continue without asking per system reminder.

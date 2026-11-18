@@ -1,0 +1,45 @@
+# Fail-closed publish / quality policy — DUP Content Engine
+# Green gate ≠ audience growth claim. Demo ≠ viral.
+
+[policy]
+version = 1
+name = "dup-content-default"
+max_posts_per_day = 3
+min_gap_hours = 3.0
+
+[media]
+# Short-form vertical by default (TikTok / Shorts / Reels)
+width = 1080
+height = 1920
+fps = 30
+min_duration_sec = 8.0
+max_duration_sec = 59.0
+min_filesize_bytes = 250_000
+audio_required = true
+max_silence_db = -40.0
+# Laptop mux + ASS fallback can drift a bit vs summed TTS
+duration_slack_sec = 2.0
+
+[voice]
+# edge-tts neural voices (no API key)
+voice = "en-US-ChristopherNeural"
+# Alternatives: ru-RU-DmitryNeural, en-US-JennyNeural, ru-RU-SvetlanaNeural
+rate = "+8%"
+
+[visuals]
+# demo / offline: synthetic ffmpeg backgrounds (no external keys)
+# live: pexels | pixabay when PEXELS_API_KEY / PIXABAY_API_KEY set
+provider = "synthetic"
+orientation = "portrait"
+
+[text]
+# Soft brand hygiene — refuse obvious impersonation / spam patterns
+stopwords = [
+  "guaranteed profit",
+  "get rich quick",
+  "clickbait scam",
+  "this is financial advice",
+]
+
+[honesty]
+note = "Fixture/demo PASS is not a growth or monetization claim."

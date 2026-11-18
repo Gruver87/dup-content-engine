@@ -1,0 +1,35 @@
+{
+  "schema": "dup.content_script.v1",
+  "title": "Why fail-closed beats silent green",
+  "description": "A 40-second Short explaining fail-closed checks for agent tools. Educational engineering demo only.",
+  "tags": ["agents", "mcp", "engineering", "shorts", "dup-labs"],
+  "language": "en",
+  "aspect": "9:16",
+  "scenes": [
+    {
+      "id": "hook",
+      "text": "Most dashboards lie with a quiet green check. Fail-closed systems refuse instead.",
+      "visual_query": "server room abstract blue lights"
+    },
+    {
+      "id": "problem",
+      "text": "If evidence is missing, the honest answer is stop — not fake confidence.",
+      "visual_query": "warning alert interface dark mode"
+    },
+    {
+      "id": "method",
+      "text": "Script, voice, visuals, render, then a policy gate with hashes and metrics.",
+      "visual_query": "software pipeline diagram futuristic"
+    },
+    {
+      "id": "proof",
+      "text": "On a laptop without a GPU: TTS plus FFmpeg, offline fixtures, no secret keys required.",
+      "visual_query": "laptop coding desk night"
+    },
+    {
+      "id": "cta",
+      "text": "Build tools people can verify. Follow for industrial agent skills and MCP trust.",
+      "visual_query": "github code scroll abstract"
+    }
+  ]
+}

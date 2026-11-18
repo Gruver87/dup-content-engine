@@ -1,0 +1,14 @@
+# One topic per line. Engine turns each into a short script template (or use --script).
+# Mix: broad reach (A) + bridge to your stack (B).
+
+# --- A · broad ---
+Why silent green checks hide broken systems
+Three signs your automation is lying to you
+Laptop media pipelines without a GPU
+What edge TTS and FFmpeg can do for Shorts
+
+# --- B · bridge to DUP Labs ---
+What fail-closed means for Agent Skills
+MCP servers you can actually verify
+Why evidence packs beat marketing screenshots
+dup-lab bootstrap in sixty seconds
