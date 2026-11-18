@@ -135,6 +135,10 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     quiet = out / "quiet.mp4"
     qv = apply_clip_volume(src, quiet, volume=0.25)
     assert qv["ok"] is True and abs(float(qv["volume"]) - 0.25) < 0.01
+    faded = out / "afade.mp4"
+    af = apply_clip_volume(src, faded, volume=1.0, audio_fade_in=0.15, audio_fade_out=0.15)
+    assert af["ok"] is True and Path(af["path"]).is_file()
+    assert float(af.get("audio_fade_in") or 0) > 0
 
     txt = out / "txt.mp4"
     tr = apply_clip_overlay_text(src, txt, text="Hook title", width=320, height=560)

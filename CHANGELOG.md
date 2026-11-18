@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.46 — 2026-11-18
+
+- Montage **audio fade** in/out (afade) per clip — not CapCut envelope keyframes
+- Console Timeline: A-fade in / out
+
 ## 0.1.45 — 2026-11-18
 
 - Montage **rotate** 90/180/270 on stitch — not CapCut free-angle / 3D

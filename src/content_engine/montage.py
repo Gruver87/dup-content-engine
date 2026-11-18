@@ -1113,20 +1113,26 @@ def apply_clip_volume(
     *,
     volume: float = 1.0,
     mute: bool = False,
+    audio_fade_in: float = 0.0,
+    audio_fade_out: float = 0.0,
     fps: int = 30,
 ) -> dict[str, Any]:
-    """Constant per-clip volume gain / mute (volume filter).
+    """Constant per-clip volume gain / mute + optional afade edges.
 
     Honesty: not CapCut multi-keyframe audio envelopes / ducking / noise reduction.
     """
     if not src.is_file():
         return {"ok": False, "error": f"missing: {src}"}
     vol = 0.0 if mute else max(0.0, min(2.0, float(volume if volume is not None else 1.0)))
+    fin = max(0.0, min(3.0, float(audio_fade_in or 0.0)))
+    fout = max(0.0, min(3.0, float(audio_fade_out or 0.0)))
     out.parent.mkdir(parents=True, exist_ok=True)
     has_audio = any(
         (s or {}).get("codec_type") == "audio" for s in (probe_json(src).get("streams") or [])
     )
-    if not has_audio or (abs(vol - 1.0) < 0.02 and not mute):
+    need_vol = abs(vol - 1.0) >= 0.02 or mute
+    need_fade = fin > 0.04 or fout > 0.04
+    if not has_audio or (not need_vol and not need_fade):
         shutil.copy2(src, out)
         return {
             "ok": True,
@@ -1134,6 +1140,8 @@ def apply_clip_volume(
             "rel": _rel(out),
             "volume": vol,
             "mute": bool(mute),
+            "audio_fade_in": fin,
+            "audio_fade_out": fout,
             "skipped": True,
         }
     args: list[str] = ["-i", str(src), "-c:v", "copy"]
@@ -1141,7 +1149,16 @@ def apply_clip_volume(
         args += ["-an"]
         vol = 0.0
     else:
-        args += ["-af", f"volume={vol:.4f}", "-c:a", "aac", "-b:a", "128k"]
+        parts: list[str] = []
+        if need_vol:
+            parts.append(f"volume={vol:.4f}")
+        dur = float(media_duration_sec(src) or 0.0)
+        if fin > 0.04:
+            parts.append(f"afade=t=in:st=0:d={fin:.3f}")
+        if fout > 0.04 and dur > 0.1:
+            st = max(0.0, dur - fout)
+            parts.append(f"afade=t=out:st={st:.3f}:d={fout:.3f}")
+        args += ["-af", ",".join(parts) if parts else "anull", "-c:a", "aac", "-b:a", "128k"]
     args.append(str(out))
     run_ffmpeg(args)
     return {
@@ -1150,8 +1167,10 @@ def apply_clip_volume(
         "rel": _rel(out),
         "volume": vol,
         "mute": bool(mute) or vol <= 0.001,
+        "audio_fade_in": fin,
+        "audio_fade_out": fout,
         "honesty": (
-            "Clip volume = constant gain / mute. "
+            "Clip volume = constant gain / mute + optional afade edges. "
             "Not CapCut audio keyframe envelopes / ducking."
         ),
     }
@@ -1315,12 +1334,30 @@ def render_timeline(
         except (TypeError, ValueError):
             volume = 1.0
         do_mute = bool(c.get("mute"))
-        if do_mute or abs(volume - 1.0) >= 0.02:
+        try:
+            af_in = float(c.get("audio_fade_in") or 0.0)
+        except (TypeError, ValueError):
+            af_in = 0.0
+        try:
+            af_out = float(c.get("audio_fade_out") or 0.0)
+        except (TypeError, ValueError):
+            af_out = 0.0
+        if do_mute or abs(volume - 1.0) >= 0.02 or af_in > 0.04 or af_out > 0.04:
             vol_out = work / f"vol_{i:03d}.mp4"
-            vr = apply_clip_volume(piece, vol_out, volume=volume, mute=do_mute, fps=fps)
+            vr = apply_clip_volume(
+                piece,
+                vol_out,
+                volume=volume,
+                mute=do_mute,
+                audio_fade_in=af_in,
+                audio_fade_out=af_out,
+                fps=fps,
+            )
             if vr.get("ok") and not vr.get("skipped"):
                 piece = vol_out
                 vol_tag = "mute" if vr.get("mute") else f"{float(vr.get('volume', volume)):.2f}"
+                if af_in > 0.04 or af_out > 0.04:
+                    vol_tag += f"+af{af_in:.1f}/{af_out:.1f}"
                 keyframe_notes.append(f"{c.get('name') or i}:vol={vol_tag}")
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
