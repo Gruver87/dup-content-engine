@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.49 — 2026-11-18
+
+Batch (one ship):
+- **Multi-aspect zip** (9:16 / 1:1 / 16:9 re-canvas)
+- Ken Burns **zoom in/out** + **warm/cool/teal** grade presets
+- Timeline **markers** + **+ smoke clip** one-click
+- Check script `scripts/check_montage_batch.ps1` (for you)
+
 ## 0.1.48 — 2026-11-18
 
 Batch (one ship):

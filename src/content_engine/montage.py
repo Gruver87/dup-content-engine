@@ -642,6 +642,7 @@ def save_timeline(
     *,
     transition: str | None = None,
     transition_sec: float | None = None,
+    markers: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     _ensure_dirs()
     prev = load_timeline()
@@ -658,19 +659,53 @@ def save_timeline(
         tsec_f = max(0.15, min(1.2, float(tsec)))
     except (TypeError, ValueError):
         tsec_f = 0.35
+    marks = markers if markers is not None else (prev.get("markers") or [])
+    if not isinstance(marks, list):
+        marks = []
     data = {
         "clips": clips,
         "transition": tkey,
         "transition_sec": tsec_f,
+        "markers": marks,
         "updated": datetime.now(timezone.utc).isoformat(),
     }
     TIMELINE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     save_montage_prefs({"transition": tkey, "transition_sec": tsec_f})
-    return {"ok": True, "timeline": data, "saved": True, "count": len(clips)}
+    return {"ok": True, "timeline": data, "saved": True, "count": len(clips), "markers": len(marks)}
 
 
 def clear_timeline() -> dict[str, Any]:
-    return save_timeline([])
+    return save_timeline([], markers=[])
+
+
+def add_timeline_marker(
+    *,
+    label: str = "mark",
+    at_sec: float = 0.0,
+) -> dict[str, Any]:
+    """Add a named marker on the timeline (local JSON only)."""
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    marks = list(tl.get("markers") or [])
+    mid = uuid.uuid4().hex[:8]
+    marks.append(
+        {
+            "id": mid,
+            "label": (label or "mark").strip()[:64] or "mark",
+            "at_sec": max(0.0, float(at_sec or 0.0)),
+        }
+    )
+    saved = save_timeline(clips, markers=marks)
+    return {
+        **saved,
+        "marker": marks[-1],
+        "honesty": "Timeline markers = local labels in timeline.json. Not CapCut beat sync / AI markers.",
+    }
+
+
+def clear_timeline_markers() -> dict[str, Any]:
+    tl = load_timeline()
+    return save_timeline(list(tl.get("clips") or []), markers=[])
 
 
 def delete_media(path_or_rel: str) -> dict[str, Any]:
@@ -1483,6 +1518,220 @@ def export_montage_zip() -> dict[str, Any]:
     }
 
 
+def export_multi_aspect_zip() -> dict[str, Any]:
+    """Re-canvas latest stitch to 9:16 / 1:1 / 16:9 and zip.
+
+    Honesty: scale+crop canvases — not CapCut auto-reframe AI / cloud Space.
+    """
+    import zipfile
+
+    mp4 = latest_edit_mp4()
+    if not mp4:
+        return {"ok": False, "error": "no stitched mp4 — stitch first"}
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    work = MONTAGE_OUT / "aspect_pack"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True)
+    files: list[Path] = []
+    for key, meta in ASPECTS.items():
+        w, h = int(meta["width"]), int(meta["height"])
+        dest = work / f"edit_{key.replace(':', 'x')}.mp4"
+        run_ffmpeg(
+            [
+                "-i",
+                str(mp4),
+                "-vf",
+                f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                str(dest),
+            ]
+        )
+        if dest.is_file():
+            files.append(dest)
+    if len(files) < 3:
+        return {"ok": False, "error": "aspect re-canvas failed", "got": [p.name for p in files]}
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    zpath = EXPORT_DIR / f"montage_aspects_{stamp}.zip"
+    with zipfile.ZipFile(zpath, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for p in files:
+            zf.write(p, arcname=p.name)
+        zf.writestr(
+            "README.txt",
+            "DUP multi-aspect pack (9:16, 1:1, 16:9)\nhonesty: crop/scale only — not auto-reframe AI.\n",
+        )
+    return {
+        "ok": zpath.is_file(),
+        "path": str(zpath),
+        "rel": _rel(zpath),
+        "aspects": [p.name for p in files],
+        "honesty": "Multi-aspect zip = scale/crop canvases. Not CapCut auto-reframe / Space.",
+    }
+
+
+GRADE_PRESETS: dict[str, dict[str, Any]] = {
+    "none": {"label": "None", "brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "cb": None},
+    "warm": {
+        "label": "Warm",
+        "brightness": 0.03,
+        "contrast": 1.05,
+        "saturation": 1.08,
+        "cb": "rs=0.06:gs=0.0:bs=-0.05",
+    },
+    "cool": {
+        "label": "Cool",
+        "brightness": 0.0,
+        "contrast": 1.05,
+        "saturation": 0.95,
+        "cb": "rs=-0.04:gs=0.0:bs=0.06",
+    },
+    "teal": {
+        "label": "Teal",
+        "brightness": -0.02,
+        "contrast": 1.08,
+        "saturation": 1.05,
+        "cb": "rs=-0.03:gs=0.02:bs=0.05",
+    },
+}
+
+
+def list_grade_presets() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "presets": {k: {"label": v["label"]} for k, v in GRADE_PRESETS.items()},
+        "default": "none",
+        "honesty": "Grade presets = eq + optional colorbalance. Not CapCut LUT marketplace.",
+    }
+
+
+def apply_grade_preset(
+    src: Path,
+    out: Path,
+    *,
+    preset: str = "warm",
+    fps: int = 30,
+) -> dict[str, Any]:
+    """Apply named warm/cool/teal look."""
+    key = (preset or "none").strip().lower()
+    if key not in GRADE_PRESETS:
+        key = "none"
+    meta = GRADE_PRESETS[key]
+    if key == "none":
+        shutil.copy2(src, out)
+        return {"ok": True, "path": str(out), "rel": _rel(out), "preset": key, "skipped": True}
+    # base eq then optional colorbalance
+    tmp = out.with_suffix(".eq.mp4")
+    g = apply_clip_grade(
+        src,
+        tmp,
+        brightness=float(meta["brightness"]),
+        contrast=float(meta["contrast"]),
+        saturation=float(meta["saturation"]),
+        fps=fps,
+    )
+    if not g.get("ok"):
+        return g
+    cb = meta.get("cb")
+    if not cb:
+        shutil.move(str(tmp), str(out))
+        return {**g, "preset": key, "path": str(out), "rel": _rel(out)}
+    has_audio = any(
+        (s or {}).get("codec_type") == "audio" for s in (probe_json(tmp).get("streams") or [])
+    )
+    args = [
+        "-i",
+        str(tmp),
+        "-vf",
+        f"colorbalance={cb}",
+        "-r",
+        str(fps),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if has_audio:
+        args += ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        args += ["-an"]
+    args.append(str(out))
+    run_ffmpeg(args)
+    tmp.unlink(missing_ok=True)
+    return {
+        "ok": out.is_file(),
+        "path": str(out),
+        "rel": _rel(out),
+        "preset": key,
+        "honesty": "Grade preset = eq+colorbalance. Not CapCut LUT pack.",
+    }
+
+
+def add_smoke_clip_to_timeline(
+    *,
+    duration_sec: float = 1.2,
+    width: int | None = None,
+    height: int | None = None,
+) -> dict[str, Any]:
+    """Generate a tiny color+tone clip into library and append to timeline."""
+    _ensure_dirs()
+    prefs = load_montage_prefs()
+    w = int(width or prefs.get("width") or 1080)
+    h = int(height or prefs.get("height") or 1920)
+    dur = max(0.5, min(5.0, float(duration_sec or 1.2)))
+    stamp = datetime.now(timezone.utc).strftime("%H%M%S")
+    dest = LIBRARY / f"smoke_{stamp}.mp4"
+    run_ffmpeg(
+        [
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=0x1f6feb:s={w}x{h}:d={dur:.2f}",
+            "-f",
+            "lavfi",
+            "-i",
+            f"sine=frequency=523:duration={dur:.2f}",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(dest),
+        ]
+    )
+    if not dest.is_file():
+        return {"ok": False, "error": "smoke clip render failed"}
+    tl = load_timeline()
+    clips = list(tl.get("clips") or [])
+    clips.append(
+        {
+            "name": dest.name,
+            "path": str(dest),
+            "rel": _rel(dest),
+            "start_sec": 0,
+            "duration_sec": round(dur, 3),
+        }
+    )
+    saved = save_timeline(clips)
+    return {
+        **saved,
+        "clip": clips[-1],
+        "honesty": "Smoke clip = generated color+tone. Not stock footage.",
+    }
+
+
 def apply_clip_rotate(
     src: Path,
     out: Path,
@@ -1688,11 +1937,12 @@ def apply_clip_keyframes(
     fade_in: float = 0.0,
     fade_out: float = 0.0,
     zoom: float = 1.0,
+    zoom_dir: str = "in",
     width: int | None = None,
     height: int | None = None,
     fps: int = 30,
 ) -> dict[str, Any]:
-    """Basic per-clip keyframes: edge fades + optional Ken Burns zoom.
+    """Basic per-clip keyframes: edge fades + optional Ken Burns zoom in/out.
 
     Honesty: not CapCut multi-track bezier keyframes / motion tracking.
     """
@@ -1704,11 +1954,25 @@ def apply_clip_keyframes(
     fin = max(0.0, min(float(fade_in or 0.0), dur / 3))
     fout = max(0.0, min(float(fade_out or 0.0), dur / 3))
     z = max(1.0, min(1.25, float(zoom or 1.0)))
+    direction = (zoom_dir or "in").strip().lower()
+    if direction not in {"in", "out"}:
+        direction = "in"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     filters: list[str] = []
-    if width and height:
-        # static zoom crop (reliable) — CapCut-ish punch-in, not bezier motion
+    nframes = max(2, int(dur * fps))
+    if width and height and z > 1.001:
+        # animated Ken Burns via zoompan (in: 1→z, out: z→1)
+        if direction == "out":
+            zexpr = f"if(eq(on,1),{z:.4f},max(1.0,zoom-{(z - 1.0) / nframes:.6f}))"
+        else:
+            zexpr = f"min(zoom+{(z - 1.0) / nframes:.6f},{z:.4f})"
+        filters.append(
+            f"scale={int(width * z) * 2}:{int(height * z) * 2},"
+            f"zoompan=z='{zexpr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d=1:s={width}x{height}:fps={fps}"
+        )
+    elif width and height:
         zw, zh = int(width * z), int(height * z)
         filters.append(
             f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
@@ -1738,6 +2002,8 @@ def apply_clip_keyframes(
         "aac",
         "-b:a",
         "128k",
+        "-t",
+        f"{dur:.3f}",
         str(out),
     ]
     run_ffmpeg(args)
@@ -1748,8 +2014,9 @@ def apply_clip_keyframes(
         "fade_in": fin,
         "fade_out": fout,
         "zoom": z,
+        "zoom_dir": direction,
         "honesty": (
-            "Basic clip keyframes = fade in/out + optional zoom. "
+            "Basic clip keyframes = fade in/out + Ken Burns in/out. "
             "Not CapCut multi-track / bezier graph editor."
         ),
     }
@@ -1867,6 +2134,7 @@ def render_timeline(
         fade_in = float(c.get("fade_in") or 0.0)
         fade_out = float(c.get("fade_out") or 0.0)
         zoom = float(c.get("zoom") or 1.0)
+        zoom_dir = str(c.get("zoom_dir") or "in")
         if fade_in > 0.04 or fade_out > 0.04 or zoom > 1.001:
             keyed = work / f"kf_{i:03d}.mp4"
             kf = apply_clip_keyframes(
@@ -1875,6 +2143,7 @@ def render_timeline(
                 fade_in=fade_in,
                 fade_out=fade_out,
                 zoom=zoom,
+                zoom_dir=zoom_dir,
                 width=width,
                 height=height,
                 fps=fps,
@@ -1882,8 +2151,15 @@ def render_timeline(
             if kf.get("ok"):
                 piece = keyed
                 keyframe_notes.append(
-                    f"{c.get('name') or i}:fi={fade_in:.2f}/fo={fade_out:.2f}/z={zoom:.2f}"
+                    f"{c.get('name') or i}:fi={fade_in:.2f}/fo={fade_out:.2f}/z={zoom:.2f}/{zoom_dir}"
                 )
+        grade_preset = str(c.get("grade_preset") or c.get("look_preset") or "").strip().lower()
+        if grade_preset and grade_preset not in {"", "none"}:
+            gp = work / f"gp_{i:03d}.mp4"
+            gr = apply_grade_preset(piece, gp, preset=grade_preset, fps=fps)
+            if gr.get("ok") and not gr.get("skipped"):
+                piece = gp
+                keyframe_notes.append(f"{c.get('name') or i}:preset={grade_preset}")
         overlay_text = str(c.get("overlay_text") or c.get("text") or "").strip()
         if overlay_text:
             ox = work / f"txt_{i:03d}.mp4"

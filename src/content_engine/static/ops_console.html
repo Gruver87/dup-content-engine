@@ -853,6 +853,20 @@ body {
             <label class="field"><span data-i18n="kfFadeIn">Fade in</span><input id="kfFadeIn" type="number" min="0" max="2" step="0.05" value="0" style="min-width:80px"/></label>
             <label class="field"><span data-i18n="kfFadeOut">Fade out</span><input id="kfFadeOut" type="number" min="0" max="2" step="0.05" value="0" style="min-width:80px"/></label>
             <label class="field"><span data-i18n="kfZoom">Zoom</span><input id="kfZoom" type="number" min="1" max="1.25" step="0.01" value="1" style="min-width:80px"/></label>
+            <label class="field"><span data-i18n="kfZoomDir">Zoom dir</span>
+              <select id="kfZoomDir" style="min-width:80px">
+                <option value="in" selected>in</option>
+                <option value="out">out</option>
+              </select>
+            </label>
+            <label class="field"><span data-i18n="clipGradePreset">Grade</span>
+              <select id="clipGradePreset" style="min-width:90px">
+                <option value="none" selected>none</option>
+                <option value="warm">warm</option>
+                <option value="cool">cool</option>
+                <option value="teal">teal</option>
+              </select>
+            </label>
             <label class="field"><span data-i18n="clipSpeed">Speed</span>
               <select id="clipSpeed" style="min-width:90px">
                 <option value="0.5">0.5×</option>
@@ -936,7 +950,19 @@ body {
             <button class="btn ghost" id="btnRevOrder" data-i18n="btnRevOrder">Reverse order</button>
             <button class="btn ghost" id="btnThumb" data-i18n="btnThumb">Thumb</button>
             <button class="btn ghost" id="btnZip" data-i18n="btnZip">Zip pack</button>
+            <button class="btn ghost" id="btnAspectsZip" data-i18n="btnAspectsZip">3-aspect zip</button>
+            <button class="btn ghost" id="btnSmoke" data-i18n="btnSmoke">+ smoke clip</button>
+            <button class="btn ghost" id="btnMark" data-i18n="btnMark">+ marker</button>
             <button class="btn" id="btnRenderTl" data-i18n="btnRenderTl">Stitch</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <label class="field" style="flex:1"><span data-i18n="markLabel">Marker label</span>
+              <input id="markLabel" type="text" value="hook" style="min-width:120px"/>
+            </label>
+            <label class="field"><span data-i18n="markAt">at (s)</span>
+              <input id="markAt" type="number" min="0" step="0.1" value="0" style="min-width:70px"/>
+            </label>
+            <div class="log" id="markLog" style="flex:1;min-height:28px"></div>
           </div>
           <div class="phone" style="margin-top:14px"><video id="montagePreview" controls playsinline></video></div>
           <div class="log" id="montageLog" style="margin-top:12px"></div>
@@ -1198,7 +1224,7 @@ const I18N = {
     chipHaveShip: "есть Save·Export·Send", chipHaveUndo: "есть Undo/Redo",
     chipHaveTrans: "есть transitions pack", chipHaveKeyframe: "есть basic keyframes",
     kfHint: "Базовые keyframes (выбранный клип)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnApplyKf: "Применить KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Скорость", clipReverse: "Назад", clipVolume: "Громкость", clipMute: "Без звука", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Текст поверх", clipFreeze: "Freeze (с)", clipFlipH: "Зеркало H", clipFlipV: "Зеркало V", clipBright: "Яркость", clipContrast: "Контраст", clipSat: "Насыщ.", clipRotate: "Поворот", clipBlur: "Блюр", clipSharpen: "Резкость", clipGray: "Ч/Б", clipVignette: "Виньетка", clipLoops: "Петли", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed на stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", btnSplit: "Разрезать", btnRevOrder: "Порядок ↔", btnThumb: "Превью-кадр", btnZip: "Zip pack", btnAspectsZip: "3 aspect zip", btnSmoke: "+ smoke", btnMark: "+ маркер", markLabel: "Маркер", markAt: "at (с)", btnApplyKf: "Применить KF",
     transHint: "Переходы (xfade)", transDur: "Длительность перехода (с)",
     gapLibTitle: "Библиотека · сверка Opus collections",
     gapLibSub: "Есть: поиск, upload, папки, collections, thumbs grid. Нет: smart object search, CapCut Space.",
@@ -1360,7 +1386,7 @@ const I18N = {
     chipHaveShip: "have Save·Export·Send", chipHaveUndo: "have Undo/Redo",
     chipHaveTrans: "have transitions pack", chipHaveKeyframe: "have basic keyframes",
     kfHint: "Basic keyframes (selected clip)",
-    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", btnSplit: "Split", btnRevOrder: "Reverse order", btnThumb: "Thumb", btnZip: "Zip pack", btnApplyKf: "Apply KF",
+    kfFadeIn: "Fade in", kfFadeOut: "Fade out", kfZoom: "Zoom", clipSpeed: "Speed", clipReverse: "Reverse", clipVolume: "Volume", clipMute: "Mute", clipAfIn: "A-fade in", clipAfOut: "A-fade out", clipOverlay: "Overlay text", clipFreeze: "Freeze (s)", clipFlipH: "Flip H", clipFlipV: "Flip V", clipBright: "Bright", clipContrast: "Contrast", clipSat: "Sat", clipRotate: "Rotate", clipBlur: "Blur", clipSharpen: "Sharpen", clipGray: "B&W", clipVignette: "Vignette", clipLoops: "Loops", clipInset: "Inset %", clipDenoise: "Denoise", clipOpacity: "Opacity", clipDeshake: "Deshake", montageBed: "Music bed on stitch", montageBedVol: "Bed vol", kfZoomDir: "Zoom dir", clipGradePreset: "Grade", btnSplit: "Split", btnRevOrder: "Reverse order", btnThumb: "Thumb", btnZip: "Zip pack", btnAspectsZip: "3-aspect zip", btnSmoke: "+ smoke clip", btnMark: "+ marker", markLabel: "Marker", markAt: "at (s)", btnApplyKf: "Apply KF",
     transHint: "Transitions (xfade)", transDur: "Transition (s)",
     gapLibTitle: "Library · Opus collections scan",
     gapLibSub: "Have: search, upload, folders, collections, thumbs grid. Missing: smart object search, CapCut Space.",
@@ -2287,6 +2313,8 @@ function renderTimeline() {
     if ($("kfFadeIn")) $("kfFadeIn").value = c.fade_in || 0;
     if ($("kfFadeOut")) $("kfFadeOut").value = c.fade_out || 0;
     if ($("kfZoom")) $("kfZoom").value = c.zoom || 1;
+    if ($("kfZoomDir")) $("kfZoomDir").value = c.zoom_dir || "in";
+    if ($("clipGradePreset")) $("clipGradePreset").value = c.grade_preset || "none";
     if ($("clipSpeed")) $("clipSpeed").value = String(c.speed || 1);
     if ($("clipReverse")) $("clipReverse").checked = !!c.reverse;
     if ($("clipVolume")) $("clipVolume").value = c.volume != null ? c.volume : 1;
@@ -2319,6 +2347,8 @@ $("btnApplyKf")?.addEventListener("click", () => {
   c.fade_in = Math.max(0, parseFloat($("kfFadeIn")?.value || "0") || 0);
   c.fade_out = Math.max(0, parseFloat($("kfFadeOut")?.value || "0") || 0);
   c.zoom = Math.max(1, Math.min(1.25, parseFloat($("kfZoom")?.value || "1") || 1));
+  c.zoom_dir = ($("kfZoomDir")?.value === "out") ? "out" : "in";
+  c.grade_preset = $("clipGradePreset")?.value || "none";
   c.speed = Math.max(0.5, Math.min(2, parseFloat($("clipSpeed")?.value || "1") || 1));
   c.reverse = !!$("clipReverse")?.checked;
   c.volume = Math.max(0, Math.min(2, parseFloat($("clipVolume")?.value || "1") || 1));
@@ -2644,6 +2674,39 @@ $("btnZip")?.addEventListener("click", async () => {
   });
   log($("montageLog"), r);
   if (r.ok) toast(t("btnZip") + " · " + (r.rel || ""));
+});
+$("btnAspectsZip")?.addEventListener("click", async () => {
+  const r = await api("/api/montage/aspects-zip", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+  });
+  log($("montageLog"), r);
+  if (r.ok) toast(t("btnAspectsZip") + " · " + (r.rel || ""));
+});
+$("btnSmoke")?.addEventListener("click", async () => {
+  const [w, h] = aspectDims(currentAspect());
+  const r = await api("/api/montage/smoke", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ duration_sec: 1.2, width: w, height: h }),
+  });
+  log($("montageLog"), r);
+  if (r.ok) {
+    TIMELINE = (r.timeline && r.timeline.clips) || TIMELINE;
+    renderTimeline(); setDirty(true);
+    toast(t("btnSmoke"));
+    await loadMedia();
+  }
+});
+$("btnMark")?.addEventListener("click", async () => {
+  const r = await api("/api/timeline/markers", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      action: "add",
+      label: $("markLabel")?.value || "mark",
+      at_sec: parseFloat($("markAt")?.value || "0") || 0,
+    }),
+  });
+  if ($("markLog")) $("markLog").textContent = JSON.stringify(r.marker || r, null, 0);
+  if (r.ok) toast(t("btnMark") + " · " + ((r.marker && r.marker.label) || ""));
 });
 
 (function wireMediaDrop() {

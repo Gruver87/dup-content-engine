@@ -1104,6 +1104,46 @@ def action_montage_zip() -> dict[str, Any]:
     return export_montage_zip()
 
 
+def action_montage_aspects_zip() -> dict[str, Any]:
+    from content_engine.montage import export_multi_aspect_zip
+
+    return export_multi_aspect_zip()
+
+
+def action_montage_smoke(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.montage import add_smoke_clip_to_timeline
+
+    body = body or {}
+    return add_smoke_clip_to_timeline(
+        duration_sec=float(body.get("duration_sec") or 1.2),
+        width=int(body["width"]) if body.get("width") else None,
+        height=int(body["height"]) if body.get("height") else None,
+    )
+
+
+def action_timeline_markers(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    from content_engine.montage import (
+        add_timeline_marker,
+        clear_timeline_markers,
+        list_grade_presets,
+        load_timeline,
+    )
+
+    body = body or {}
+    action = str(body.get("action") or "list").lower()
+    if action == "add":
+        return add_timeline_marker(
+            label=str(body.get("label") or "mark"),
+            at_sec=float(body.get("at_sec") or 0.0),
+        )
+    if action == "clear":
+        return clear_timeline_markers()
+    if action == "presets":
+        return list_grade_presets()
+    tl = load_timeline()
+    return {"ok": True, "markers": tl.get("markers") or [], "count": len(tl.get("markers") or [])}
+
+
 def action_montage_send(body: dict[str, Any] | None = None) -> dict[str, Any]:
     from content_engine.montage import send_montage
 

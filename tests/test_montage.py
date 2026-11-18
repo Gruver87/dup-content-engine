@@ -2,6 +2,7 @@ from pathlib import Path
 
 from content_engine.ffmpeg_util import run_ffmpeg
 from content_engine.montage import (
+    add_timeline_marker,
     apply_clip_crop_inset,
     apply_clip_denoise,
     apply_clip_freeze,
@@ -15,11 +16,13 @@ from content_engine.montage import (
     apply_clip_rotate,
     apply_clip_speed,
     apply_clip_volume,
+    apply_grade_preset,
     aspect_size,
     concat_clips,
     delete_media,
     image_to_clip,
     list_aspects,
+    list_grade_presets,
     list_media,
     list_transitions,
     resolve_aspect,
@@ -194,6 +197,30 @@ def test_apply_clip_speed(tmp_path, monkeypatch):
     op = out / "op.mp4"
     opr = apply_clip_opacity(src, op, opacity=0.7, width=320, height=560, fps=12)
     assert opr["ok"] is True and Path(opr["path"]).is_file()
+
+    gp = out / "warm.mp4"
+    gpr = apply_grade_preset(src, gp, preset="warm", fps=12)
+    assert gpr["ok"] is True and Path(gpr["path"]).is_file()
+    assert "warm" in list_grade_presets()["presets"]
+
+
+def test_markers_and_zoom_dir(tmp_path, monkeypatch):
+    out = tmp_path / "montage"
+    monkeypatch.setattr("content_engine.montage.MONTAGE_OUT", out)
+    monkeypatch.setattr("content_engine.montage.TIMELINE", out / "timeline.json")
+    monkeypatch.setattr("content_engine.montage.PREFS_PATH", out / "montage_prefs.json")
+    out.mkdir(parents=True)
+    save_timeline([{"name": "a", "path": "x.mp4", "start_sec": 0}])
+    m = add_timeline_marker(label="hook", at_sec=1.5)
+    assert m["ok"] is True and m["marker"]["label"] == "hook"
+
+    src = out / "src.mp4"
+    _tiny_mp4(src, 1.0)
+    dest = out / "kb.mp4"
+    r = apply_clip_keyframes(
+        src, dest, fade_in=0.05, zoom=1.1, zoom_dir="out", width=320, height=560, fps=12
+    )
+    assert r["ok"] is True and r.get("zoom_dir") == "out"
 
 
 def test_aspect_presets(tmp_path, monkeypatch):

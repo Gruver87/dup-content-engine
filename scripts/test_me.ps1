@@ -26,7 +26,8 @@ function Require-Ok($label) {
 }
 
 Step "1) install editable + dev"
-python -m pip install -e ".[dev]" -q
+# -q already quiet; filter leftover pip noise (broken ~* dirs in site-packages)
+python -m pip install -e ".[dev]" -q 2>&1 | Where-Object { $_ -notmatch "Ignoring invalid distribution" }
 Require-Ok "pip install"
 
 Step "2) unit tests (pytest)"
