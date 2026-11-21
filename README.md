@@ -4,6 +4,8 @@
 
 Industrial shape, beginner entry: one install, one `demo`, one evidence folder. No GPU required. System FFmpeg optional (`imageio-ffmpeg` ships a binary). TikTok = **file export + manual upload** (no cookie bots, no donor scrape).
 
+**Beginner?** → [`docs/START_HERE.md`](docs/START_HERE.md)
+
 > Demo `ALLOW` ≠ audience growth. A green gate means the file passed policy checks — not that it will go viral.
 
 ## Why this exists
